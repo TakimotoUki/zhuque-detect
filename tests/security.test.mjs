@@ -203,7 +203,9 @@ test('MCP refuses calls before initialization and blocked client resource reads'
 });
 test('MCP works from an unrelated cwd after copying to a Chinese/space path', async () => {
   const moved = path.join(dir, '我的 MCP tools'); fs.cpSync(fileURLToPath(new URL('../src', import.meta.url)), moved, { recursive: true });
-  const replies = await mcp([{ jsonrpc: '2.0', id: 2, method: 'tools/list' }], 'codex_cli_rs', path.join(moved, 'mcp-server.mjs'));
+  const entry = path.join(moved, 'mcp-server.mjs');
+  assert.ok(fs.existsSync(entry), `Copied MCP entry missing; directory entries: ${JSON.stringify(fs.readdirSync(moved))}`);
+  const replies = await mcp([{ jsonrpc: '2.0', id: 2, method: 'tools/list' }], 'codex_cli_rs', entry);
   assert.equal(replies.find(r => r.id === 2).result.tools.length, 5);
 });
 test.after(async () => { for (const s of servers) { s.closeAllConnections(); await new Promise(r => s.close(r)); } fs.rmSync(dir, { recursive: true, force: true }); });
