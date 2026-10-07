@@ -392,9 +392,13 @@ await testAsync('配置：写入 / 读取 / 掩码 / 权限 / 校验', async () 
   assert.equal(cfg.timeout_ms, 45000);
   assert.equal(cfg.auto_open, true);
 
-  // 含密钥的文件权限必须是 0600
-  const mode = fs.statSync(file).mode & 0o777;
-  assert.equal(mode, 0o600, `配置权限应为 600，实际 ${mode.toString(8)}`);
+  // Unix mode bits do not represent Windows ACLs.
+  const stat = fs.statSync(file);
+  assert.ok(stat.isFile());
+  if (process.platform !== 'win32') {
+    const mode = stat.mode & 0o777;
+    assert.equal(mode, 0o600, `配置权限应为 600，实际 ${mode.toString(8)}`);
+  }
 
   // 非法值必须被拒绝
   assert.throws(() => writeConfig({ port: 99999 }), /端口超出范围/);
