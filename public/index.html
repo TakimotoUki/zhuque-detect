@@ -105,13 +105,13 @@
   .seg{border:1px solid var(--line);border-left:3px solid var(--ai);border-radius:9px;padding:11px 14px;margin-bottom:9px;
     background:var(--panel-2)}
   .seg.s0{border-left-color:#3fb950}
-  .seg.s1{border-left-color:var(--warn)}
-  .seg.s2{border-left-color:var(--ai)}
+  .seg.s2{border-left-color:var(--warn)}
+  .seg.s1{border-left-color:var(--ai)}
   .seg-head{display:flex;gap:10px;align-items:center;font-size:12.5px;color:var(--fg-dim);margin-bottom:6px;flex-wrap:wrap}
   .sev{font-weight:600;font-size:12px;padding:1px 8px;border-radius:5px}
   .sev.s0{background:rgba(63,185,80,.16);color:#56d364}
-  .sev.s1{background:rgba(210,153,34,.16);color:#e3b341}
-  .sev.s2{background:rgba(248,81,73,.16);color:#ff8078}
+  .sev.s2{background:rgba(210,153,34,.16);color:#e3b341}
+  .sev.s1{background:rgba(248,81,73,.16);color:#ff8078}
   .seg-body{font:15px/1.9 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;color:#c8d3e0;white-space:pre-wrap;word-break:break-word}
   .mono-pos{font-variant-numeric:tabular-nums;color:var(--fg-faint)}
   .segfilter{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
@@ -132,8 +132,8 @@
   }
   .fulltext .ft-seg{border-radius:3px;padding:1px 0;box-decoration-break:clone;-webkit-box-decoration-break:clone}
   .fulltext .ft-seg.s0{background:rgba(63,185,80,.16);box-shadow:inset 0 -2px 0 rgba(63,185,80,.55)}
-  .fulltext .ft-seg.s1{background:rgba(210,153,34,.17);box-shadow:inset 0 -2px 0 rgba(210,153,34,.55)}
-  .fulltext .ft-seg.s2{background:rgba(248,81,73,.17);box-shadow:inset 0 -2px 0 rgba(248,81,73,.6)}
+  .fulltext .ft-seg.s2{background:rgba(210,153,34,.17);box-shadow:inset 0 -2px 0 rgba(210,153,34,.55)}
+  .fulltext .ft-seg.s1{background:rgba(248,81,73,.17);box-shadow:inset 0 -2px 0 rgba(248,81,73,.6)}
   .fulltext.plain .ft-seg{background:none;box-shadow:none}
   .fulltext .ft-plain{opacity:.88}
 
@@ -836,7 +836,7 @@ function segSpans(segments) {
     if (!(end > start)) continue;
     spans.push({
       start, end,
-      label: Number(s.label ?? 1),
+      label: Number(s.label ?? 2),
       name: s.label_name || '',
       conf: Number(s.confidence ?? 0),
     });
@@ -857,7 +857,7 @@ function buildFullHtml(text, segments) {
     if (start > cursor) html += escapeHtml(text.slice(cursor, start));
     const from = Math.max(cursor, start);
     if (end > from) {
-      const lv = (s.label >= 0 && s.label <= 2) ? s.label : 1;
+      const lv = (s.label >= 0 && s.label <= 2) ? s.label : 2;
       const tip = `${s.name || '未知'} · 置信度 ${(s.conf * 100).toFixed(2)}%`;
       html += `<span class="ft-seg s${lv}" title="${escapeHtml(tip)}">${escapeHtml(text.slice(from, end))}</span>`;
       cursor = end;
@@ -959,10 +959,10 @@ function renderSegs(segs) {
     const pos = p ? `[${Number(p[0])}, ${Number(p[1])})` : '';
     const cat = s.category || s.label_key || 'ai';
     const catName = s.label_name || ({ human: '人工特征', suspected_ai: '疑似 AI', ai: 'AI 特征' }[cat] || cat);
-    return `<div class="seg s${[0,1,2].includes(s.label) ? s.label : 1}" data-cat="${escapeHtml(cat)}">
+    return `<div class="seg s${[0,1,2].includes(s.label) ? s.label : 2}" data-cat="${escapeHtml(cat)}">
       <div class="seg-head">
         <span>#${Number(s.order ?? s.index) || 0}</span>
-        <span class="sev s${[0,1,2].includes(s.label) ? s.label : 1}">${escapeHtml(catName)}</span>
+        <span class="sev s${[0,1,2].includes(s.label) ? s.label : 2}">${escapeHtml(catName)}</span>
         <span>置信度 ${((s.confidence ?? 0) * 100).toFixed(2)}%</span>
         <span class="mono-pos">${pos}</span>
         ${s.chars ? `<span class="mono-pos">${Number(s.chars) || 0} 字</span>` : ''}

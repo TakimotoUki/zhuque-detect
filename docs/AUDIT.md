@@ -43,7 +43,7 @@
 
 ## 验证方式
 
-`node src/selftest.mjs` 是现有功能回归；`node tests/security.test.mjs` 用本机假上游和合成凭据检查安全与边界；`node tests/site.test.mjs` 验证系统主题、手动覆盖/持久化、返回自动模式与存储受限；`node tests/platform.test.mjs` 在原生 macOS/Windows 运行启动、改端口后的身份识别和停止；`node src/webcheck.mjs` 检查网页脚本与 DOM 合约。测试状态目录都在临时目录，不读取真实 token.txt，不发送付费腾讯请求。
+`node src/selftest.mjs` 是现有功能回归；`node tests/security.test.mjs` 用本机假上游和合成凭据检查安全与边界；`node tests/site.test.mjs` 验证系统主题、手动覆盖/持久化、返回自动模式与存储受限；`node tests/platform.test.mjs` 在原生 macOS/Windows 运行启动、改端口后的身份识别和停止；`node src/webcheck.mjs` 检查网页脚本与 DOM 合约。自动测试状态目录都在临时目录，不读取真实 token.txt，不发送腾讯请求。另于 2026-10-08 对 1.3.0 核心进行一次真实 API 验证，合成测试文章 236 字、整体 AI 100%、段落 label=1，官方返回扣减 394 token；未保存测试文章历史。
 
 MCP 回归以实际子进程 stdio 执行 Codex clientInfo 的 initialize → tools/list → tools/call；包括立即 EOF、初始化前调用、拒绝客户端资源读取、复制到中文/空格路径并从无关 cwd 启动。这个测试证明本服务的协议与路径处理；客户端实际 PATH、信任设置、第三方客户端版本和真实腾讯账号状态仍需用户本机检查。并未把 mock 分数当真实降幅。
 
@@ -51,11 +51,11 @@ GitHub Actions 在 macOS、Windows、Ubuntu 与 Node 22/24 上执行相同检查
 
 ## 保留边界
 
-- 腾讯官方文档明确整体占比 `labels_ratio` 为 0 人工、1 AI、2 疑似 AI；段落 `segment_labels` 的 1/2 约定沿用项目已有实际响应样本，官方示例未完整枚举。上游变更需重新对照；未知段落标签按疑似处理。位置按 JavaScript UTF-16，若上游位置与文本不符，应核对片段再改写。
+- 腾讯官方文档明确整体占比 `labels_ratio` 为 0 人工、1 AI、2 疑似 AI；一次真实 API 验证确认段落 `segment_labels` 的 1=AI，与整体比例一致；2=疑似 AI，已修正旧版反向解释。上游变更需重新对照；未知段落标签按疑似处理。位置按 JavaScript UTF-16，若上游位置与文本不符，应核对片段再改写。
 - 默认保存完整历史，原文会发到腾讯。配置备份仍可含旧 Key；删除当前配置不能消除备份。Windows 文件 ACL 由用户目录控制。
 - 客户端名字可模拟，名单不构成身份认证。具备本机用户权限的程序可以访问该用户的 Key。HTTP 服务不适合作为公共多租户服务；远程部署还需要自行配置 TLS 与访问网络。
 - 本地用量并非云端余额；其他程序的消费不自动同步，混合账号汇总也不能当成某个账号余额。成功调用但存储写失败会在结果中提示本地统计/历史不完整。
 - 同步存储锁超时会失败，不抢占遗留锁；崩溃后需先确认相关进程停止再手动清理。不针对本机已具备写权限的恶意用户提供隔离。
-- 自动审查与 mock 回归不证明真实模型可达、改写一定达到目标、全部客户端版本兼容，或不存在所有未来风险。
+- 一次真实调用证明当时的接口可达；自动审查与 mock 回归不证明未来持续可达、改写一定达到目标、全部客户端版本兼容，或不存在所有未来风险。
 
 额度来源与校核：官网未登录 5 次/日，登录后 20 次/日由项目发起者于 2026-10-08 实测；API 当前每账号每月 50 万 token，依据 [腾讯 API 文档](https://cloud.tencent.com/document/product/1552/137539)和[同账号共享额度说明](https://pages.edgeone.ai/zh/use-cases/free-llm-api)。当期配额以[控制台](https://console.cloud.tencent.com/edgeone/makers?tab=models&subTab=apikey)为准。

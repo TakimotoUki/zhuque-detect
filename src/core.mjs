@@ -70,19 +70,19 @@ export { CONFIG_DIR, configPath, applyConfigToEnv };
 /** 朱雀三种标签的语义 */
 export const LABELS = {
   0: { key: 'human', name_zh: '人工特征', name_en: 'human', desc: '人工写作特征明显' },
-  1: { key: 'suspected_ai', name_zh: '疑似 AI', name_en: 'suspected_ai', desc: '介于人工与 AI 之间' },
-  2: { key: 'ai', name_zh: 'AI 特征', name_en: 'ai', desc: 'AI 生成特征明显' },
+  1: { key: 'ai', name_zh: 'AI 特征', name_en: 'ai', desc: 'AI 生成特征明显' },
+  2: { key: 'suspected_ai', name_zh: '疑似 AI', name_en: 'suspected_ai', desc: '介于人工与 AI 之间' },
 };
 
 /**
  * 朱雀官网的三项分类展示口径。
- * 注意与 labels_ratio 的映射关系（官方 labels_ratio 中 1=AI、2=疑似），
+ * 段落与整体比例统一：0=人工、1=AI、2=疑似，
  * 展示顺序按官网：人工特征 → 疑似 AI → AI 特征。
  */
 export const CATEGORIES = [
   { key: 'human', label: 0, name_zh: '人工特征', name_en: 'human' },
-  { key: 'suspected_ai', label: 1, name_zh: '疑似 AI', name_en: 'suspected_ai' },
-  { key: 'ai', label: 2, name_zh: 'AI 特征', name_en: 'ai' },
+  { key: 'suspected_ai', label: 2, name_zh: '疑似 AI', name_en: 'suspected_ai' },
+  { key: 'ai', label: 1, name_zh: 'AI 特征', name_en: 'ai' },
 ];
 
 /** 结论分档：risk_score ∈ [0,1]，越大越像 AI */
@@ -583,8 +583,7 @@ export function normalize(raw, ctx = {}) {
   if (raw.labels_ratio && (![0,1,2].every(k => typeof lr[k] === 'number' && Number.isFinite(lr[k]) && lr[k] >= 0 && lr[k] <= 1) || Math.abs(lr[0] + lr[1] + lr[2] - 1) > 0.02)) throw new ZhuqueError('BAD_RESPONSE', '上游分类占比无效', '', 502);
   if (!raw.labels_ratio && !raw.segment_labels?.length) throw new ZhuqueError('BAD_RESPONSE', '响应没有可用分类数据', '', 502);
   const humanRate = clamp01(num(lr['0']));
-  // Tencent documents labels_ratio 1=AI, 2=suspected AI. Segment labels
-  // have a separate convention (1=suspected, 2=AI); do not conflate them.
+  // Tencent labels_ratio and live segment_labels use 1=AI, 2=suspected AI.
   const suspectedRate = clamp01(num(lr['2']));
   const aiRate = clamp01(num(lr['1']));
 
@@ -599,8 +598,8 @@ export function normalize(raw, ctx = {}) {
   const segments = Array.isArray(raw.segment_labels)
     ? raw.segment_labels.map((s, i) => {
       if (!s || typeof s !== 'object' || Array.isArray(s)) throw new ZhuqueError('BAD_RESPONSE', '上游段落数据格式无效', '', 502);
-      const label = [0, 1, 2].includes(s.label) ? s.label : 1;
-        const meta = LABELS[label] || LABELS[1];
+      const label = [0, 1, 2].includes(s.label) ? s.label : 2;
+        const meta = LABELS[label] || LABELS[2];
         const p = s.position;
         const position = Array.isArray(p) && p.length === 2 && p.every(Number.isSafeInteger) && p[0] >= 0 && p[1] > p[0] ? [...p] : null;
         const full = typeof s.text === 'string' ? s.text : '';
@@ -1150,7 +1149,7 @@ export function buildFullText(result = {}, explicitText) {
 }
 
 /** 三档标签对应的终端颜色码（0=人工 绿 / 1=疑似 AI 黄 / 2=AI 特征 红） */
-export const labelColor = (label) => (label === 0 ? '32' : label === 1 ? '33' : '31');
+export const labelColor = (label) => (label === 0 ? '32' : label === 2 ? '33' : '31');
 
 export function renderText(result, { color = true, full = true, text, segmentLimit = 40 } = {}) {
   const c = (code, s) => (color ? `\u001b[${code}m${s}\u001b[0m` : s);

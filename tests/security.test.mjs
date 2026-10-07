@@ -144,6 +144,10 @@ test('successful detection reports a failed usage write instead of showing compl
     assert.ok(r.warnings.some(w => w.code === 'USAGE_WRITE_FAILED'));
   } finally { process.env.ZHUQUE_USAGE_FILE = saved; }
 });
+test('live API label 1 consistently represents AI in ratios, segment names and counts', () => {
+  const r = normalize({ status: 'success', labels_ratio: {0:0,1:1,2:0}, segment_labels: [{text:'test',label:1,position:[0,4]}] });
+  assert.equal(r.segments[0].label_name, 'AI 特征'); assert.equal(r.categories.ai.chars, 4); assert.equal(r.categories.suspected_ai.chars, 0);
+});
 test('chunking preserves trailing whitespace and complete emoji', () => {
   const text = 'abc😀尾\n\n    '; const parts = chunkText(text, 4); assert.equal(parts.join(''), text);
   assert.ok(parts.every(p => !/^[\uDC00-\uDFFF]|[\uD800-\uDBFF]$/.test(p)));
@@ -179,8 +183,11 @@ async function mcp(messages, name = 'Codex', entry = fileURLToPath(new URL('../s
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [entry], { env: { ...process.env, ZHUQUE_MCP_CLIENT: '' }, stdio: ['pipe', 'pipe', 'pipe'] });
     const timer = setTimeout(() => { child.kill(); reject(new Error('MCP test timed out')); }, 10000);
-    let stdout = ''; child.stdout.on('data', b => stdout += b); child.stderr.resume(); child.on('error', reject);
-    child.on('close', () => { clearTimeout(timer); try { resolve(stdout.trim().split('\n').filter(Boolean).map(JSON.parse)); } catch (e) { reject(e); } });
+    let stdout = '', stderr = ''; child.stdout.on('data', b => stdout += b); child.stderr.on('data', b => stderr += b); child.on('error', reject);
+    child.on('close', code => { clearTimeout(timer); try {
+      if (code !== 0 || !stdout.trim()) throw Error(`MCP exited ${code}: ${stderr}`);
+      resolve(stdout.trim().split('\n').filter(Boolean).map(JSON.parse));
+    } catch (e) { reject(e); } });
     if (name) child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', clientInfo: { name, version: 'test' } } }) + '\n');
     child.stdin.end(messages.map(JSON.stringify).join('\n') + '\n');
   });

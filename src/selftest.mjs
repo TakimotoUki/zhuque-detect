@@ -108,9 +108,9 @@ const fixtureAi = {
   ratio_confidence: 0.75,
   labels_ratio: { 0: 0.25, 1: 0.5, 2: 0.25 },
   segment_labels: [
-    { text: '人工智能技术的快速发展正在深刻改变着我们的生活方式。', label: 2, conf: 0.99, order: 1, position: [0, 26] },
+    { text: '人工智能技术的快速发展正在深刻改变着我们的生活方式。', label: 1, conf: 0.99, order: 1, position: [0, 26] },
     { text: '今天下午我去楼下买了杯咖啡，顺手把快递取了。', label: 0, conf: 0.98, order: 2, position: [26, 49] },
-    { text: '总体而言需要持续关注其影响。', label: 1, conf: 0.7, order: 3, position: [49, 62] },
+    { text: '总体而言需要持续关注其影响。', label: 2, conf: 0.7, order: 3, position: [49, 62] },
   ],
   usage: { total_tokens: 300 },
   msg: '',
@@ -136,7 +136,7 @@ test('AI 文本 → verdict=ai，ai_rate=0.75（AI+疑似）', () => {
   assert.deepEqual(r.flagged_segments[0].position, [0, 26]);
 });
 
-test('三段占比对齐官网语义：label 1=疑似 AI，label 2=AI 特征', () => {
+test('三段占比对齐官网语义：label 1=AI 特征，label 2=疑似 AI', () => {
   const r = normalize(fixtureAi, { text: 'x'.repeat(200) });
   assert.ok(r.categories, 'categories 应存在');
   assert.equal(r.categories.basis, 'labels_ratio', '上游整体占比优先于可能稀疏的分段');

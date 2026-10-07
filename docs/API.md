@@ -27,7 +27,7 @@
 
 官方 [朱雀 API 文档](https://cloud.tencent.com/document/product/1552/137539)把 `labels_ratio` 定义为 0=人工、1=AI、2=疑似 AI。整体占比优先使用该字段，不以可能只覆盖部分原文的分段推翻整体比例。三项归一到总和 1，`ai_rate=AI+疑似 AI`；若没有整体比例才按段落字符数统计。
 
-`categories.*.percent` 始终是 0~100 的百分数，`ratio` 为 0~1。`categories.basis` 指出 `labels_ratio` 或 `segment_chars`。`composition` 表示上游整体比例。分段标签沿用当前适配约定 0=人工、1=疑似 AI、2=AI；腾讯文档没有单独写明分段标签枚举，此映射有 fixture 和演示验证，应在上游模型更新时复核。
+`categories.*.percent` 始终是 0~100 的百分数，`ratio` 为 0~1。`categories.basis` 指出 `labels_ratio` 或 `segment_chars`。`composition` 表示上游整体比例。分段标签统一为 0=人工、1=AI、2=疑似 AI。2026-10-08 的真实 API 验证返回整体 AI 100%、段落 label=1，确认该映射；旧版反向解释 1/2 已修正。未知标签按疑似 AI 处理。
 
 `segments` 带段落文本、归属、置信度和 `position[start,end)`；分块时附带 `global_position`，应优先用全局下标。`risk_score=max(ai_rate,ai_probability)` 与结论分档是本项目的展示规则，不是腾讯对作者身份的判决。
 

@@ -2,7 +2,7 @@
   "name": "zhuque-detect",
   "version": "1.3.0",
   "private": true,
-  "description": "基于腾讯朱雀 AI 文本检测的 MCP 工具，让 Codex、WorkBuddy 等 Agent 自动检测、定位、改写并复检 AI 率。",
+  "description": "基于腾讯朱雀 AI 文本检测，提供本机网页检测、全文高亮与历史；通过 MCP 连接 Codex、WorkBuddy 等 Agent 自动优化 AI 率。",
   "type": "module",
   "engines": {
     "node": ">=22"

@@ -14,10 +14,13 @@ delete env.ZHUQUE_API_KEY;
 const native = process.platform === 'win32' ? ['powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(root, 'scripts/win/start.ps1')]] : ['bash', [path.join(root, 'start.sh')]];
 function command(action) {
   return new Promise((resolve, reject) => {
-    const child = spawn(native[0], [...native[1], action], { env, cwd: tmp });
+    const child = spawn(native[0], [...native[1], action], { env, cwd: tmp, stdio: ['ignore', 'pipe', 'pipe'] });
     let out = ''; child.stdout.on('data', b => out += b); child.stderr.on('data', b => out += b);
     const timer = setTimeout(() => { child.kill(); reject(Error('Launcher timeout: ' + out)); }, 25000);
-    child.on('error', reject); child.on('close', code => { clearTimeout(timer); resolve({ code, out }); });
+    child.on('error', reject);
+    // Windows descendants can keep inherited pipe handles open. The launcher's
+    // exit determines completion; its background server is checked separately.
+    child.on('exit', code => { clearTimeout(timer); child.stdout.destroy(); child.stderr.destroy(); resolve({ code, out }); });
   });
 }
 test('native launcher starts, survives port changes for identity, and stops only its process', { skip: process.platform === 'linux', timeout: 60000 }, async () => {
