@@ -7,7 +7,7 @@ import path from 'node:path';
 import http from 'node:http';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'zq-security-'));
+const dir = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'zq-security-')));
 for (const [env, name] of Object.entries({ ZHUQUE_CONFIG_FILE: 'config.json', ZHUQUE_HISTORY_FILE: 'history.jsonl', ZHUQUE_USAGE_FILE: 'usage.json', ZHUQUE_KEYS_FILE: 'keys.json', ZHUQUE_TOKEN_FILE: 'token.txt' })) process.env[env] = path.join(dir, name);
 for (const k of ['ZHUQUE_API_KEY', 'EDGEONE_API_KEY', 'EDGEONE_MAKERS_API_KEY', 'ZHUQUE_ENDPOINT', 'ZHUQUE_ALLOWED_ORIGINS']) delete process.env[k];
 const { detect, callZhuque, chunkText, normalize, clearCache, resolveKeyChoice, resolveEndpoint } = await import('../src/core.mjs');
@@ -202,8 +202,15 @@ test('MCP refuses calls before initialization and blocked client resource reads'
   const blocked = await mcp([{ jsonrpc: '2.0', id: 3, method: 'resources/read', params: { uri: 'zhuque://schema' } }], 'random-client'); assert.equal(blocked.find(r => r.id === 3).error.code, -32001);
 });
 test('MCP works from an unrelated cwd after copying to a Chinese/space path', async () => {
-  const moved = path.join(dir, '我的 MCP tools'); fs.cpSync(fileURLToPath(new URL('../src', import.meta.url)), moved, { recursive: true });
-  const replies = await mcp([{ jsonrpc: '2.0', id: 2, method: 'tools/list' }], 'codex_cli_rs', path.join(moved, 'mcp-server.mjs'));
+  const moved = path.join(dir, '我的 MCP tools');
+  const source = fileURLToPath(new URL('../src', import.meta.url));
+  // Node 22's native cpSync mishandles non-ASCII Windows destinations
+  // (nodejs/node#61950). Copy the flat source files using libuv-backed APIs.
+  fs.mkdirSync(moved);
+  for (const file of fs.readdirSync(source)) fs.copyFileSync(path.join(source, file), path.join(moved, file));
+  const entry = path.join(moved, 'mcp-server.mjs');
+  assert.ok(fs.existsSync(entry), 'Copied MCP entry must exist before startup');
+  const replies = await mcp([{ jsonrpc: '2.0', id: 2, method: 'tools/list' }], 'codex_cli_rs', entry);
   assert.equal(replies.find(r => r.id === 2).result.tools.length, 5);
 });
 test.after(async () => { for (const s of servers) { s.closeAllConnections(); await new Promise(r => s.close(r)); } fs.rmSync(dir, { recursive: true, force: true }); });
