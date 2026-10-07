@@ -31,7 +31,7 @@ enabled = true
 tool_timeout_sec = 300
 ```
 
-`command="node"` 依靠客户端继承的 PATH，不绑定作者电脑的运行时路径。GUI 客户端找不到 Node 时，填本机 Node 的完整路径即可；这属于本机注册配置，不应提交到仓库。MCP 读取程序根目录的本地 Key 文件、环境变量或用户配置，不依赖客户端的工作目录。换机器或移动目录后重新注册。注册生成器通过 realpath 输出原生长路径，避免 Windows 临时目录的 8.3 别名与中文目录组合影响 Node 主入口解析。
+`command="node"` 依靠客户端继承的 PATH，不绑定作者电脑的运行时路径。GUI 客户端找不到 Node 时，填本机 Node 的完整路径即可；这属于本机注册配置，不应提交到仓库。MCP 读取程序根目录的本地 Key 文件、环境变量或用户配置，不依赖客户端的工作目录。换机器或移动目录后重新注册。注册生成器通过 realpath 输出原生绝对路径，避免注册到符号链接或临时路径别名。
 
 使用 `codex mcp list` 验证注册，在客户端查看 MCP 连接状态；调用 `get_zhuque_service_info` 确认版本 1.3.0，再调用 `detect_ai_text`。`doctor` 和检测会产生腾讯侧 token 用量。`--target codex --write` 仍只输出注册指导，避免误写 JSON。
 

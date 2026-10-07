@@ -202,9 +202,14 @@ test('MCP refuses calls before initialization and blocked client resource reads'
   const blocked = await mcp([{ jsonrpc: '2.0', id: 3, method: 'resources/read', params: { uri: 'zhuque://schema' } }], 'random-client'); assert.equal(blocked.find(r => r.id === 3).error.code, -32001);
 });
 test('MCP works from an unrelated cwd after copying to a Chinese/space path', async () => {
-  const moved = path.join(dir, '我的 MCP tools'); fs.cpSync(fileURLToPath(new URL('../src', import.meta.url)), moved, { recursive: true });
+  const moved = path.join(dir, '我的 MCP tools');
+  const source = fileURLToPath(new URL('../src', import.meta.url));
+  // Node 22's native cpSync mishandles non-ASCII Windows destinations
+  // (nodejs/node#61950). Copy the flat source files using libuv-backed APIs.
+  fs.mkdirSync(moved);
+  for (const file of fs.readdirSync(source)) fs.copyFileSync(path.join(source, file), path.join(moved, file));
   const entry = path.join(moved, 'mcp-server.mjs');
-  assert.ok(fs.existsSync(entry), `Copied MCP entry missing; directory entries: ${JSON.stringify(fs.readdirSync(moved))}`);
+  assert.ok(fs.existsSync(entry), 'Copied MCP entry must exist before startup');
   const replies = await mcp([{ jsonrpc: '2.0', id: 2, method: 'tools/list' }], 'codex_cli_rs', entry);
   assert.equal(replies.find(r => r.id === 2).result.tools.length, 5);
 });
