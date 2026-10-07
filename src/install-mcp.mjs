@@ -27,7 +27,7 @@ import { fileURLToPath } from 'node:url';
 import { isMainModule } from './is-main.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const MCP_SERVER = path.resolve(__dirname, 'mcp-server.mjs');
+const MCP_SERVER = fs.realpathSync.native(path.resolve(__dirname, 'mcp-server.mjs'));
 const NODE_BIN = 'node';
 
 const HOME = os.homedir();

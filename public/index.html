@@ -657,7 +657,7 @@ const VERDICT_COLOR = {
 
 // ---- 字数统计 ----
 function syncCount() {
-  // 按码点计数，emoji / 代理对不会被算成 2 个字（与服务端的 chars 口径一致）
+  // 按码点计数，emoji / 代理对不会被算成 2 个字；服务端位置和分块上限按 UTF-16 代码单元
   const n = [...input.value].length;
   const c = $('#count');
   c.textContent = `${n} 字`;

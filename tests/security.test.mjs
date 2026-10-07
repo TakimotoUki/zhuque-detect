@@ -7,7 +7,7 @@ import path from 'node:path';
 import http from 'node:http';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'zq-security-'));
+const dir = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'zq-security-')));
 for (const [env, name] of Object.entries({ ZHUQUE_CONFIG_FILE: 'config.json', ZHUQUE_HISTORY_FILE: 'history.jsonl', ZHUQUE_USAGE_FILE: 'usage.json', ZHUQUE_KEYS_FILE: 'keys.json', ZHUQUE_TOKEN_FILE: 'token.txt' })) process.env[env] = path.join(dir, name);
 for (const k of ['ZHUQUE_API_KEY', 'EDGEONE_API_KEY', 'EDGEONE_MAKERS_API_KEY', 'ZHUQUE_ENDPOINT', 'ZHUQUE_ALLOWED_ORIGINS']) delete process.env[k];
 const { detect, callZhuque, chunkText, normalize, clearCache, resolveKeyChoice, resolveEndpoint } = await import('../src/core.mjs');
