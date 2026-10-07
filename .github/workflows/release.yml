@@ -1,0 +1,36 @@
+name: Platform release packages
+on:
+  release:
+    types: [published]
+permissions:
+  contents: write
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+      - run: node scripts/check-release.mjs
+      - run: node scripts/pack.mjs
+      - run: node scripts/check-release.mjs dist/zhuque-detect-mac && node scripts/check-release.mjs dist/zhuque-detect-win
+      - name: ZIP archives and checksums
+        run: |
+          python3 - <<'PY'
+          import hashlib, pathlib, zipfile, json
+          version = json.loads(pathlib.Path('package.json').read_text())['version']
+          release = pathlib.Path('release'); release.mkdir()
+          sums = []
+          for platform in ('mac', 'win'):
+              folder = pathlib.Path('dist') / ('zhuque-detect-' + platform)
+              archive = release / ('zhuque-detect-' + platform + '-v' + version + '.zip')
+              with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as z:
+                  for f in sorted(folder.rglob('*')):
+                      if f.is_file(): z.write(f, f.relative_to(folder.parent))
+              sums.append(hashlib.sha256(archive.read_bytes()).hexdigest() + '  ' + archive.name)
+          (release / 'SHA256SUMS').write_text('\n'.join(sums) + '\n')
+          PY
+      - run: node scripts/release-upload.mjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

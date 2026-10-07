@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# ---------------------------------------------------------------------------
+# zhuque —— 便捷启动器（无需 npm link / 全局安装）
+#
+#   ./bin/zhuque detect "文本"
+#   ./bin/zhuque serve --open
+#   ./bin/zhuque doctor
+#
+# 不写死任何机器专属路径：node 的定位逻辑见 bin/lib.sh。
+# ---------------------------------------------------------------------------
+set -euo pipefail
+
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# shellcheck source=lib.sh
+. "$DIR/bin/lib.sh"
+
+NODE_BIN="$(zhuque_find_node)" || {
+  zhuque_node_missing_help
+  exit 127
+}
+
+NODE_MAJOR="$(zhuque_node_major "$NODE_BIN")"
+if [ -z "$NODE_MAJOR" ] || [ "$NODE_MAJOR" -lt "$ZHUQUE_MIN_NODE_MAJOR" ]; then
+  printf '需要 Node.js 22 或更新的受支持版本。\n' >&2
+  exit 127
+fi
+exec "$NODE_BIN" "$DIR/src/cli.mjs" "$@"

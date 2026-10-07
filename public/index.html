@@ -1,0 +1,1711 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>朱雀 AI 率检测</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔍</text></svg>" />
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel-2:#1c2230; --line:#2b3444;
+    --fg:#e6edf3; --fg-dim:#b3bfd0; --fg-faint:#a0aec0;
+    --accent:#4d9fff; --accent-soft:rgba(77,159,255,.14);
+    --human:#3fb950; --ai:#f85149; --warn:#d29922;
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:
+      radial-gradient(1100px 600px at 12% -8%, rgba(77,159,255,.13), transparent 60%),
+      radial-gradient(900px 500px at 92% 4%, rgba(248,81,73,.09), transparent 62%),
+      var(--bg);
+    color:var(--fg);
+    font:15px/1.65 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
+    min-height:100vh;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:38px 22px 80px}
+
+  header{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:26px}
+  h1{font-size:25px;margin:0 0 6px;letter-spacing:-.3px}
+  h1 .dot{color:var(--accent)}
+  .sub{color:var(--fg-dim);font-size:13.5px;margin:0}
+  .sub code{background:var(--panel-2);padding:2px 6px;border-radius:5px;font-size:12.5px}
+  .status{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--fg-dim);
+    background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:6px 13px;white-space:nowrap}
+  .status .led{width:8px;height:8px;border-radius:50%;background:var(--fg-faint)}
+  .status.ok .led{background:var(--human);box-shadow:0 0 8px rgba(63,185,80,.85)}
+  .status.bad .led{background:var(--ai);box-shadow:0 0 8px rgba(248,81,73,.85)}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin-bottom:18px}
+  .card h2{font-size:14px;margin:0 0 14px;color:var(--fg-dim);font-weight:600;letter-spacing:.4px}
+
+  textarea{
+    width:100%;min-height:210px;resize:vertical;background:#0b0f16;color:var(--fg);
+    border:1px solid var(--line);border-radius:10px;padding:15px;font:16px/1.85 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    outline:none;transition:border-color .16s, box-shadow .16s;
+  }
+  textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  textarea::placeholder{color:var(--fg-faint)}
+
+  .toolbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:14px}
+  .count{color:var(--fg-faint);font-size:12.5px;font-variant-numeric:tabular-nums}
+  .count.warn{color:var(--warn)}
+  .spacer{flex:1}
+
+  .check{display:flex;align-items:center;gap:7px;color:var(--fg-dim);font-size:13px;cursor:pointer;user-select:none}
+  .check input{accent-color:var(--accent);width:15px;height:15px;cursor:pointer}
+
+  button{font:inherit;border-radius:10px;cursor:pointer;border:1px solid var(--line);
+    background:var(--panel-2);color:var(--fg);padding:9px 17px;transition:.15s}
+  button:hover:not(:disabled){border-color:#3d4b60;background:#222a38}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  button.primary{background:linear-gradient(180deg,#5aa6ff,#3b82f6);border-color:#4f93e8;color:#fff;font-weight:600;
+    box-shadow:0 4px 16px rgba(59,130,246,.3)}
+  button.primary:hover:not(:disabled){background:linear-gradient(180deg,#6bb0ff,#4a8df8)}
+  button.ghost{background:transparent}
+  button.small{padding:6px 12px;font-size:12.5px}
+
+  .hidden{display:none !important}
+
+  /* 结果区 */
+  .verdict-head{display:flex;gap:26px;align-items:center;flex-wrap:wrap}
+  .gauge{position:relative;flex:0 0 auto}
+  .gauge .val{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .gauge .num{font-size:34px;font-weight:700;letter-spacing:-1.2px;font-variant-numeric:tabular-nums;line-height:1}
+  .gauge .lbl{font-size:11.5px;color:var(--fg-faint);margin-top:3px;letter-spacing:.6px}
+  .gauge circle{transition:stroke-dashoffset .7s cubic-bezier(.22,1,.36,1), stroke .4s}
+
+  .verdict-info{flex:1;min-width:260px}
+  .badge{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:999px;font-weight:600;font-size:14px;
+    border:1px solid currentColor}
+  .badge .k{font-size:11px;opacity:.75;font-weight:400}
+  .advice{color:var(--fg-dim);font-size:13.5px;margin:12px 0 0}
+  .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:16px}
+  .metric{background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:9px 12px}
+  .metric .m-l{font-size:11px;color:var(--fg-faint);letter-spacing:.3px}
+  .metric .m-v{font-size:16px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:2px}
+
+  .compbar{display:flex;height:12px;border-radius:6px;overflow:hidden;margin-top:18px;background:#0b0f16;border:1px solid var(--line)}
+  .compbar div{transition:width .6s cubic-bezier(.22,1,.36,1)}
+  .complegend{display:flex;gap:18px;flex-wrap:wrap;margin-top:9px;font-size:12px;color:var(--fg-dim)}
+  .complegend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px}
+
+  /* 三段占比（对齐朱雀官网） */
+  .cat-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}
+  .cat{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;position:relative;overflow:hidden}
+  .cat::after{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:currentColor;opacity:.9}
+  .cat .c-name{font-size:12.5px;color:var(--fg-dim);display:flex;align-items:center;gap:6px}
+  .cat .c-name i{width:8px;height:8px;border-radius:2px;display:inline-block}
+  .cat .c-val{font-size:23px;font-weight:700;letter-spacing:-.7px;font-variant-numeric:tabular-nums;margin-top:5px}
+  .cat .c-sub{font-size:11.5px;color:var(--fg-faint);margin-top:3px;font-variant-numeric:tabular-nums}
+  .cat.human{color:#3fb950}.cat.suspected_ai{color:#d29922}.cat.ai{color:#f85149}
+
+  .segs{margin-top:6px}
+  .seg{border:1px solid var(--line);border-left:3px solid var(--ai);border-radius:9px;padding:11px 14px;margin-bottom:9px;
+    background:var(--panel-2)}
+  .seg.s0{border-left-color:#3fb950}
+  .seg.s1{border-left-color:var(--warn)}
+  .seg.s2{border-left-color:var(--ai)}
+  .seg-head{display:flex;gap:10px;align-items:center;font-size:12.5px;color:var(--fg-dim);margin-bottom:6px;flex-wrap:wrap}
+  .sev{font-weight:600;font-size:12px;padding:1px 8px;border-radius:5px}
+  .sev.s0{background:rgba(63,185,80,.16);color:#56d364}
+  .sev.s1{background:rgba(210,153,34,.16);color:#e3b341}
+  .sev.s2{background:rgba(248,81,73,.16);color:#ff8078}
+  .seg-body{font:15px/1.9 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;color:#c8d3e0;white-space:pre-wrap;word-break:break-word}
+  .mono-pos{font-variant-numeric:tabular-nums;color:var(--fg-faint)}
+  .segfilter{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+  .segfilter button{padding:4px 11px;font-size:12px;border-radius:999px}
+  .segfilter button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--fg)}
+
+  /* 检测全文（完整展示，不截断） */
+  .ft-bar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:11px}
+  .ft-bar .ft-stat{font-size:12.5px;color:var(--fg-faint);font-variant-numeric:tabular-nums}
+  .ft-bar .spacer{flex:1}
+  .ft-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--fg-dim);margin-bottom:10px}
+  .ft-legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:middle}
+  .fulltext{
+    font:16px/1.95 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    white-space:pre-wrap;word-break:break-word;
+    background:#0b0f16;border:1px solid var(--line);border-radius:10px;
+    padding:14px 16px;max-height:none;overflow:visible;color:#c8d3e0;
+  }
+  .fulltext .ft-seg{border-radius:3px;padding:1px 0;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+  .fulltext .ft-seg.s0{background:rgba(63,185,80,.16);box-shadow:inset 0 -2px 0 rgba(63,185,80,.55)}
+  .fulltext .ft-seg.s1{background:rgba(210,153,34,.17);box-shadow:inset 0 -2px 0 rgba(210,153,34,.55)}
+  .fulltext .ft-seg.s2{background:rgba(248,81,73,.17);box-shadow:inset 0 -2px 0 rgba(248,81,73,.6)}
+  .fulltext.plain .ft-seg{background:none;box-shadow:none}
+  .fulltext .ft-plain{opacity:.88}
+
+  /* 检测历史 */
+  .hist-toolbar{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:13px}
+  .hist-toolbar input[type=text]{flex:1;min-width:160px;font-family:inherit;font-size:13px}
+  .hist-item{border:1px solid var(--line);border-radius:10px;padding:11px 14px;margin-bottom:9px;background:var(--panel-2);cursor:pointer;transition:.15s}
+  .hist-item:hover{border-color:#3d4b60;background:#222a38}
+  .hist-top{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;font-size:12.5px;color:var(--fg-faint);font-variant-numeric:tabular-nums}
+  .hist-top .h-rate{font-weight:700;font-size:15px}
+  .hist-src{font-size:11px;padding:1px 7px;border-radius:5px;background:#0b0f16;border:1px solid var(--line);color:var(--fg-faint)}
+  .hist-preview{font-size:12.5px;color:var(--fg-dim);margin-top:6px;line-height:1.55;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .hist-mini{display:flex;height:6px;border-radius:3px;overflow:hidden;margin-top:8px;background:#0b0f16}
+  .hist-mini div{transition:width .4s}
+  #histDetail{border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:13px;background:#12171f}
+
+  /* Key 池 */
+  .keypool-row{display:flex;gap:10px;align-items:center;padding:10px 12px;border:1px solid var(--line);
+    border-radius:9px;margin-bottom:8px;background:var(--panel-2)}
+  .keypool-row .kp-main{flex:1;min-width:0}
+  .keypool-row .kp-label{font-size:13px;font-weight:600}
+  .keypool-row .kp-meta{font-size:11.5px;color:var(--fg-faint);font-variant-numeric:tabular-nums;margin-top:2px}
+  .kstatus{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+  .kstatus.ok{color:#56d364}.kstatus.cool{color:#e3b341}.kstatus.bad{color:#ff8078}.kstatus.off{color:var(--fg-faint)}
+  .keypool-add{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  .keypool-add input{flex:1;min-width:140px}
+
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:0}
+  .tabs button{border:none;background:transparent;border-radius:8px 8px 0 0;color:var(--fg-faint);padding:8px 14px;font-size:13px}
+  .tabs button.on{color:var(--fg);background:var(--panel-2);box-shadow:inset 0 -2px 0 var(--accent)}
+  .pane{padding-top:16px}
+  pre{background:#0b0f16;border:1px solid var(--line);border-radius:10px;padding:14px;overflow:auto;max-height:440px;
+    font:12.5px/1.65 ui-monospace,Menlo,monospace;color:#c8d3e0;margin:0}
+  pre.json{max-height:520px}
+
+  .warnbox{border:1px solid rgba(210,153,34,.4);background:rgba(210,153,34,.09);border-radius:9px;padding:10px 14px;
+    margin-bottom:10px;font-size:13px;color:#e3b341}
+  .errbox{border:1px solid rgba(248,81,73,.45);background:rgba(248,81,73,.1);border-radius:9px;padding:13px 16px;
+    font-size:13.5px;color:#ff9b95;margin-bottom:16px;white-space:pre-wrap}
+  .errbox b{color:#ffb3ae}
+  .pagehelp{color:var(--fg-faint);font-size:12.5px;margin-top:10px}
+  .hist-hd{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+  .hist-hd h2{margin:0}
+  .hist-hd .spacer{flex:1}
+  .hist-empty{color:var(--fg-faint);font-size:13px;padding:18px 0;text-align:center}
+
+  .agent-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .agent-grid h3{font-size:13px;margin:0 0 8px;color:var(--fg-dim);font-weight:600}
+  .hint{font-size:12px;color:var(--fg-faint);margin-top:8px}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .footer{color:var(--fg-faint);font-size:12px;text-align:center;margin-top:34px;line-height:1.9}
+  .spin{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,.28);border-top-color:#fff;
+    border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px;margin-right:7px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .head-right{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end}
+  select{width:100%;background:#0b0f16;color:var(--fg);border:1px solid var(--line);border-radius:9px;
+    padding:10px 13px;font:14px/1.5 inherit;outline:none;cursor:pointer;transition:.16s}
+  select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .key-chip{cursor:pointer;transition:.15s}
+  .key-chip:hover{border-color:var(--accent);color:var(--fg)}
+
+  /* ---------- 用量面板 ---------- */
+  .usage-card{padding:16px 20px}
+  .usage-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:13px}
+  .usage-head h2{margin:0;font-size:13px;color:var(--fg-dim);font-weight:600;letter-spacing:.4px}
+  .usage-head .spacer{flex:1}
+  .upd{color:var(--fg-faint);font-size:12px;font-variant-numeric:tabular-nums}
+  .usage-body{display:flex;gap:26px;flex-wrap:wrap;align-items:center}
+  .usage-main{flex:2 1 380px;min-width:280px}
+  .usage-nums{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+  .usage-nums .big{font-size:27px;font-weight:700;letter-spacing:-.8px;font-variant-numeric:tabular-nums;line-height:1}
+  .usage-nums .unit{color:var(--fg-dim);font-size:12.5px}
+  .usage-nums .pct{font-size:12.5px;padding:2px 9px;border-radius:999px;background:var(--panel-2);border:1px solid var(--line)}
+  .usage-bar{height:9px;border-radius:5px;background:#0b0f16;border:1px solid var(--line);overflow:hidden;margin:11px 0 8px}
+  .usage-bar div{height:100%;width:0;border-radius:4px;transition:width .7s cubic-bezier(.22,1,.36,1)}
+  .usage-sub{color:var(--fg-faint);font-size:12px;font-variant-numeric:tabular-nums}
+  .usage-side{flex:1 1 230px;min-width:210px}
+  .spark{display:flex;align-items:flex-end;gap:3px;height:44px;margin-bottom:7px;
+    border-bottom:1px solid var(--line);padding-bottom:1px}
+  .spark i{flex:1;background:linear-gradient(180deg,#4d9fff,#2f6fd0);border-radius:2px 2px 0 0;min-height:2px;
+    position:relative;transition:height .5s cubic-bezier(.22,1,.36,1)}
+  .spark i:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);
+    background:#000d;color:#fff;font-size:11px;padding:3px 7px;border-radius:5px;white-space:nowrap;z-index:5}
+  .usage-stats{display:grid;grid-template-columns:1fr 1fr;gap:5px 14px;font-size:12px;color:var(--fg-dim)}
+  .usage-stats b{color:var(--fg);font-variant-numeric:tabular-nums;font-weight:600}
+  .key-chip{display:inline-flex;align-items:center;gap:7px;background:var(--panel-2);border:1px solid var(--line);
+    border-radius:999px;padding:4px 12px;font-size:12px;color:var(--fg-dim);font-family:ui-monospace,Menlo,monospace}
+  .key-chip.bad{border-color:rgba(248,81,73,.5);color:#ff9b95}
+
+  /* ---------- 设置弹层 ---------- */
+  .overlay{position:fixed;inset:0;background:rgba(4,7,12,.74);backdrop-filter:blur(4px);z-index:50;
+    display:flex;align-items:flex-start;justify-content:center;padding:40px 18px;overflow:auto}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:16px;width:100%;max-width:660px;
+    box-shadow:0 24px 70px rgba(0,0,0,.6);animation:pop .2s cubic-bezier(.22,1,.36,1)}
+  @keyframes pop{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
+  .modal-head{display:flex;align-items:center;justify-content:space-between;padding:17px 22px;border-bottom:1px solid var(--line)}
+  .modal-head h2{margin:0;font-size:16px;color:var(--fg)}
+  .modal-body{padding:20px 22px 22px}
+  .field-label{display:block;font-size:13px;color:var(--fg-dim);margin-bottom:7px;font-weight:600}
+  .field-label .req{color:var(--warn);font-size:11px;font-weight:400}
+  .input-row{display:flex;gap:9px}
+  .input-row input{flex:1;min-width:0}
+  input[type=text],input[type=password],input[type=number]{
+    width:100%;background:#0b0f16;color:var(--fg);border:1px solid var(--line);border-radius:9px;
+    padding:10px 13px;font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;outline:none;transition:.16s}
+  input[type=text]:focus,input[type=password]:focus,input[type=number]:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  input::placeholder{color:var(--fg-faint)}
+  .modal-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:16px}
+  .modal-actions .spacer{flex:1}
+  .test-msg{font-size:12.5px;padding:7px 12px;border-radius:8px;line-height:1.5}
+  .test-msg.ok{background:rgba(63,185,80,.13);color:#56d364;border:1px solid rgba(63,185,80,.35)}
+  .test-msg.bad{background:rgba(248,81,73,.13);color:#ff9b95;border:1px solid rgba(248,81,73,.4)}
+  .test-msg.busy{background:var(--panel-2);color:var(--fg-dim);border:1px solid var(--line)}
+  details{border:1px solid var(--line);border-radius:10px;margin-top:16px;background:#12171f}
+  details summary{cursor:pointer;padding:11px 15px;font-size:13px;color:var(--fg-dim);user-select:none;list-style:none}
+  details summary::-webkit-details-marker{display:none}
+  details summary::before{content:'▸ ';color:var(--fg-faint)}
+  details[open] summary::before{content:'▾ '}
+  details .d-body{padding:2px 15px 16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:13px}
+  .notice{border-radius:9px;padding:10px 14px;font-size:12.5px;line-height:1.6;margin-bottom:16px}
+  .notice.warn{border:1px solid rgba(210,153,34,.42);background:rgba(210,153,34,.09);color:#e3b341}
+  .notice.err{border:1px solid rgba(248,81,73,.45);background:rgba(248,81,73,.1);color:#ff9b95}
+  .notice.info{border:1px solid var(--line);background:var(--panel-2);color:var(--fg-dim)}
+  .notice code{font-size:12px}
+  .kv{font-size:12px;color:var(--fg-faint);font-variant-numeric:tabular-nums}
+  .kv b{color:var(--fg-dim);font-weight:600}
+
+  @media(max-width:640px){ h1{font-size:21px} .gauge .num{font-size:28px} .usage-body{gap:16px} }
+  button:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+  .agent-grid>*{min-width:0}.card{box-shadow:0 10px 32px rgba(0,0,0,.08)}
+  #authDialog{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:16px;width:min(440px,90vw);padding:24px}
+  #authDialog::backdrop{background:rgba(0,0,0,.6)}
+  @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<dialog id="authDialog" aria-labelledby="authTitle"><form method="dialog">
+<h2 id="authTitle">服务访问令牌</h2><p>远程服务需要令牌。仅保留在当前页面内存中。</p>
+<label for="authInput">访问令牌</label><input id="authInput" type="password" autocomplete="off" style="width:100%;margin:16px 0">
+<button value="cancel">取消</button><button id="authSubmit" value="save" class="primary">连接服务</button>
+</form></dialog>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>朱雀 <span class="dot">AI 率</span> 检测</h1>
+      <p class="sub">输入文本即调用腾讯朱雀 AIGC 检测模型 · 同步提供 HTTP API 与 <code>MCP</code> 供其他 Agent 调用</p>
+    </div>
+    <div class="head-right">
+      <span class="key-chip" id="keyChip" title="点击查看当前生效的 API Key 与配置">Key：未配置</span>
+      <div class="status" id="status"><span class="led"></span><span id="statusText">检查服务…</span></div>
+      <button class="ghost small" id="authBtn">访问令牌</button>
+      <button class="ghost small" id="openSettings">⚙ 设置</button>
+    </div>
+  </header>
+
+  <!-- 免费额度用量 -->
+  <div class="card usage-card" id="usageCard">
+    <div class="usage-head">
+      <h2>免费额度用量</h2>
+      <span class="upd" id="usageCycle"></span>
+      <span class="spacer"></span>
+      <label class="check"><input type="checkbox" id="autoRefresh" checked /> 自动刷新</label>
+      <span class="upd" id="usageUpdated">—</span>
+      <button class="ghost small" id="refreshUsage">刷新</button>
+    </div>
+    <div class="usage-body">
+      <div class="usage-main">
+        <div class="usage-nums">
+          <span class="big" id="usageRemaining">—</span>
+          <span class="unit">token 剩余</span>
+          <span class="pct" id="usagePct">—</span>
+        </div>
+        <div class="usage-bar"><div id="usageBar"></div></div>
+        <div class="usage-sub" id="usageSub">正在读取本地用量账本…</div>
+      </div>
+      <div class="usage-side">
+        <div class="spark" id="usageSpark"></div>
+        <div class="usage-stats" id="usageStats"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>待检测文本</h2>
+    <textarea id="input" placeholder="在此粘贴或输入需要检测的文本，建议 120 字以上以获得可靠结论。（快捷键 ⌘/Ctrl + Enter 开始检测）"></textarea>
+    <div class="toolbar">
+      <span class="count" id="count">0 字</span>
+      <label class="check"><input type="checkbox" id="merge" checked /> 合并段落输出整体结论</label>
+      <span class="spacer"></span>
+      <button class="ghost small" id="pasteBtn">读取剪贴板</button>
+      <button class="ghost small" id="sampleBtn">填入示例</button>
+      <button class="ghost small" id="clearBtn">清空</button>
+      <button class="primary" id="runBtn">开始检测</button>
+    </div>
+  </div>
+
+  <div id="error" class="errbox hidden"></div>
+  <div id="result" class="hidden">
+
+    <div class="card">
+      <h2>检测结论</h2>
+      <div class="verdict-head">
+        <div class="gauge">
+          <svg width="152" height="152" viewBox="0 0 152 152">
+            <circle cx="76" cy="76" r="64" fill="none" stroke="#222b38" stroke-width="13" />
+            <circle id="arc" cx="76" cy="76" r="64" fill="none" stroke="var(--accent)" stroke-width="13"
+                    stroke-linecap="round" transform="rotate(-90 76 76)"
+                    stroke-dasharray="402.1" stroke-dashoffset="402.1" />
+          </svg>
+          <div class="val">
+            <div class="num" id="gaugeNum">–</div>
+            <div class="lbl">AI 率</div>
+          </div>
+        </div>
+        <div class="verdict-info">
+          <span class="badge" id="badge">—</span>
+          <p class="advice" id="advice"></p>
+          <div class="metrics" id="metrics"></div>
+        </div>
+      </div>
+      <div class="compbar">
+        <div id="barHuman" style="width:0;background:linear-gradient(90deg,#3fb950,#56d364)"></div>
+        <div id="barSus" style="width:0;background:linear-gradient(90deg,#d29922,#e3b341)"></div>
+        <div id="barAi" style="width:0;background:linear-gradient(90deg,#f85149,#ff7b72)"></div>
+      </div>
+      <div class="complegend">
+        <span><i style="background:#3fb950"></i>人工特征 <b id="lgHuman">0%</b></span>
+        <span><i style="background:#d29922"></i>疑似 AI <b id="lgSus">0%</b></span>
+        <span><i style="background:#f85149"></i>AI 特征 <b id="lgAi">0%</b></span>
+        <span style="margin-left:auto;color:var(--fg-faint)" id="catBasis"></span>
+      </div>
+
+      <div class="cat-cards">
+        <div class="cat human">
+          <div class="c-name"><i style="background:#3fb950"></i>人工特征</div>
+          <div class="c-val" id="catHumanVal">0%</div>
+          <div class="c-sub" id="catHumanSub">0 段 / 0 字</div>
+        </div>
+        <div class="cat suspected_ai">
+          <div class="c-name"><i style="background:#d29922"></i>疑似 AI</div>
+          <div class="c-val" id="catSusVal">0%</div>
+          <div class="c-sub" id="catSusSub">0 段 / 0 字</div>
+        </div>
+        <div class="cat ai">
+          <div class="c-name"><i style="background:#f85149"></i>AI 特征</div>
+          <div class="c-val" id="catAiVal">0%</div>
+          <div class="c-sub" id="catAiSub">0 段 / 0 字</div>
+        </div>
+      </div>
+      <p class="pagehelp" id="catNote"></p>
+    </div>
+
+    <div class="card" id="fullCard">
+      <h2>检测全文 <span id="fullCount" style="color:var(--fg-faint);font-weight:400"></span></h2>
+      <div class="ft-bar">
+        <div class="ft-stat" id="fullStat">—</div>
+        <span class="spacer"></span>
+        <button class="ghost small" id="fullToggle">切换为纯文本</button>
+        <button class="ghost small" id="fullCopy">复制全文</button>
+        <button class="ghost small" id="fullDl">下载 .txt</button>
+      </div>
+      <div class="ft-legend">
+        <span><i style="background:#3fb950"></i>人工特征</span>
+        <span><i style="background:#d29922"></i>疑似 AI</span>
+        <span><i style="background:#f85149"></i>AI 特征</span>
+        <span style="color:var(--fg-faint)">未着色部分未被判为 AI（原文完整呈现，不做任何截断）</span>
+      </div>
+      <div class="fulltext" id="fullText"></div>
+    </div>
+
+    <div class="card" id="segCard">
+      <h2>逐段归属 <span id="segCount" style="color:var(--fg-faint);font-weight:400"></span></h2>
+      <div class="segfilter" id="segFilter">
+        <button data-f="all" class="on">全部</button>
+        <button data-f="ai">仅 AI 特征</button>
+        <button data-f="suspected_ai">仅疑似 AI</button>
+        <button data-f="flagged">仅 AI + 疑似</button>
+        <button data-f="human">仅人工特征</button>
+      </div>
+      <div class="segs" id="segs"></div>
+      <div class="pagehelp">每段给出归属类别与置信度，position 为该段在原文中的 [起, 止) 区间，可直接定位改写后复检。</div>
+    </div>
+
+    <div class="card">
+      <div class="tabs">
+        <button class="on" data-tab="visual">结构化 JSON</button>
+        <button data-tab="agent">给其他 Agent 调用</button>
+      </div>
+      <div class="pane" id="pane-visual">
+        <pre class="json" id="jsonOut"></pre>
+        <div class="toolbar" style="margin-top:12px">
+          <button class="ghost small" id="copyJson">复制 JSON</button>
+          <button class="ghost small" id="dlJson">下载 JSON</button>
+          <span class="hint">该 JSON 即 HTTP 接口的 <code>data</code> 字段，字段语义见 <a href="/api/schema" target="_blank">/api/schema</a></span>
+        </div>
+      </div>
+      <div class="pane hidden" id="pane-agent">
+        <div class="agent-grid">
+          <div>
+            <h3>① HTTP 接口（任何语言 / 任何 Agent）</h3>
+            <pre id="curlBox"></pre>
+            <div class="hint">也可用便捷 GET：<code>/api/detect?text=你的文本</code></div>
+          </div>
+          <div>
+            <h3>② MCP 工具（Claude / Cursor / WorkBuddy 等）</h3>
+            <pre id="mcpBox"></pre>
+            <div class="hint">配置后 Agent 会看到 <code>detect_ai_text</code> 与 <code>detect_ai_text_batch</code> 两个工具</div>
+          </div>
+        </div>
+        <div class="toolbar" style="margin-top:14px">
+          <button class="ghost small" id="copyCurl">复制 cURL</button>
+          <a href="/llms.txt" target="_blank"><button class="ghost small">查看 llms.txt</button></a>
+          <a href="/api/schema" target="_blank"><button class="ghost small">查看完整 Schema</button></a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 检测历史 -->
+  <div class="card" id="histCard">
+    <div class="hist-hd">
+      <h2>检测历史</h2>
+      <span class="upd" id="histStats"></span>
+      <span class="spacer"></span>
+      <button class="ghost small" id="histRefresh">刷新</button>
+      <button class="ghost small" id="histExportJson">导出 JSON</button>
+      <button class="ghost small" id="histExportCsv">导出 CSV</button>
+      <button class="ghost small" id="histClear">清空</button>
+    </div>
+    <div class="hist-toolbar">
+      <input type="text" id="histSearch" placeholder="搜索历史（关键词 / id / Key 标签）" />
+      <select id="histVerdict" style="width:auto;min-width:130px">
+        <option value="">全部结论</option>
+        <option value="human">人工</option>
+        <option value="mostly_human">偏人工</option>
+        <option value="mixed">人机混合</option>
+        <option value="likely_ai">疑似 AI 生成</option>
+        <option value="ai">AI 生成</option>
+      </select>
+      <select id="histSource" style="width:auto;min-width:110px">
+        <option value="">全部来源</option>
+        <option value="web">网页</option>
+        <option value="api">HTTP API</option>
+        <option value="cli">命令行</option>
+        <option value="mcp">MCP</option>
+        <option value="batch">批量</option>
+      </select>
+    </div>
+    <div id="histDetail" class="hidden"></div>
+    <div id="histList"><div class="hist-empty">加载中…</div></div>
+  </div>
+
+  <p class="footer">
+    上游能力：腾讯朱雀（通过 EdgeOne Makers 内置模型 <code>@makers/zhuque-text</code>）<br />
+    检测结果仅作为辅助信号，不构成对内容来源的绝对判定
+  </p>
+</div>
+
+<!-- ============ 设置弹层 ============ -->
+<div class="overlay hidden" id="settingsOverlay">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <div class="modal-head">
+      <h2 id="settingsTitle">设置</h2>
+      <button class="ghost small" id="closeSettings">关闭</button>
+    </div>
+    <div class="modal-body">
+      <div id="cfgNotice"></div>
+
+      <label class="field-label" for="cfgApiKey">朱雀 API Key <span class="req">必填</span></label>
+      <div class="input-row">
+        <input type="password" id="cfgApiKey" placeholder="粘贴 EdgeOne Makers API Key" autocomplete="off" spellcheck="false" />
+        <button class="ghost small" id="toggleKey" type="button">显示</button>
+      </div>
+      <p class="hint" style="margin-top:8px">
+        在 <a href="https://console.cloud.tencent.com/edgeone/makers?tab=models&subTab=apikey" target="_blank" rel="noreferrer">EdgeOne 控制台 → Makers → Models → API Key</a> 创建。
+        保存后写入本机 <code id="cfgPath">~/.zhuque/config.json</code>（权限 0600），立即生效，无需重启。
+      </p>
+
+      <div class="modal-actions">
+        <span id="testResult"></span>
+        <span class="spacer"></span>
+        <button class="ghost" id="clearKey" type="button">清除已保存的 Key</button>
+        <button class="ghost" id="testKey" type="button">测试连接</button>
+        <button class="primary" id="saveCfg" type="button">保存</button>
+      </div>
+
+      <details id="keyPoolDetails">
+        <summary>API Key 池（多把 Key 自动轮换，用尽自动切换）</summary>
+        <div class="d-body" style="display:block">
+          <p class="hint" style="margin:0 0 12px">
+            池中每把 Key 都会被轮流使用；某把 Key 额度用尽（429 / 额度耗尽）或失效（401/403）时，
+            自动标记并切换到下一把，无需人工干预。密钥只在本机保存，界面上永远只显示掩码。
+          </p>
+          <div id="keyPoolList"></div>
+          <div class="keypool-add">
+            <input type="password" id="kpNewKey" placeholder="粘贴新 Key（格式 sk-...）" autocomplete="off" spellcheck="false" />
+            <input type="text" id="kpNewLabel" placeholder="备注（如：主号）" style="max-width:160px" />
+            <input type="text" id="kpNewAccount" placeholder="所属账号标识（可选，同账号填相同值）" aria-label="所属账号标识">
+          <button class="ghost small" id="kpAdd" type="button">添加到池</button>
+          </div>
+          <div style="margin-top:12px;display:flex;gap:9px;flex-wrap:wrap;align-items:center">
+            <button class="ghost small" id="kpSave" type="button">保存 Key 池</button>
+            <button class="ghost small" id="kpReset" type="button">重置冷却状态</button>
+            <span class="kv" id="kpStorage"></span>
+          </div>
+        </div>
+      </details>
+
+      <details id="advDetails">
+        <summary>高级设置（上游地址、超时、缓存、服务端口）</summary>
+        <div class="d-body">
+          <div>
+            <label class="field-label" for="cfgEndpoint">上游接口地址</label>
+            <input type="text" id="cfgEndpoint" placeholder="https://ai-gateway.edgeone.link/v1/providers/zhuque-text/classify" />
+          </div>
+          <div>
+            <label class="field-label" for="cfgTimeout">请求超时（毫秒）</label>
+            <input type="number" id="cfgTimeout" min="1000" step="1000" placeholder="60000" />
+          </div>
+          <div>
+            <label class="field-label" for="cfgMaxChars">单块最大字符数</label>
+            <input type="number" id="cfgMaxChars" min="200" step="500" placeholder="20000" />
+          </div>
+          <div>
+            <label class="field-label" for="cfgCacheTtl">结果缓存有效期（毫秒）</label>
+            <input type="number" id="cfgCacheTtl" min="0" step="60000" placeholder="600000" />
+          </div>
+          <div>
+            <label class="field-label" for="cfgPort">服务端口</label>
+            <input type="number" id="cfgPort" min="1" max="65535" placeholder="8787" />
+          </div>
+          <div>
+            <label class="field-label" for="cfgHost">监听地址</label>
+            <input type="text" id="cfgHost" placeholder="127.0.0.1" />
+          </div>
+          <div>
+            <label class="field-label" for="cfgServerToken">服务访问令牌</label>
+            <input type="password" id="cfgServerToken" placeholder="留空表示不鉴权" autocomplete="off" />
+          </div>
+          <div>
+            <label class="field-label" for="cfgAutoOpen">启动后自动打开浏览器</label>
+            <select id="cfgAutoOpen">
+              <option value="">未设置</option>
+              <option value="true">是</option>
+              <option value="false">否</option>
+            </select>
+          </div>
+        </div>
+      </details>
+
+      <details id="usageDetails">
+        <summary>用量与额度（免费额度、账期、校准）</summary>
+        <div class="d-body">
+          <div>
+            <label class="field-label" for="cfgQuota">每月免费额度（token）</label>
+            <input type="number" id="cfgQuota" min="1" step="1000" placeholder="500000" />
+          </div>
+          <div>
+            <label class="field-label" for="cfgCycleDay">账期起始日（1~31）</label>
+            <input type="number" id="cfgCycleDay" min="1" max="31" placeholder="1" />
+          </div>
+          <div style="grid-column:1/-1">
+            <label class="field-label" for="cfgCalibrate">用控制台读数校准已用量</label>
+            <div class="input-row">
+              <input type="number" id="cfgCalibrate" min="0" step="1"
+                placeholder="填入控制台显示的周期内已用 token" />
+              <button class="ghost small" id="btnCalibrate" type="button">校准</button>
+            </div>
+            <p class="hint" style="margin-top:7px">
+              官方未开放额度查询 API，剩余额度由本地逐次累加推算。到
+              <a href="https://console.cloud.tencent.com/edgeone/makers?tab=models&subTab=overview" target="_blank" rel="noreferrer">控制台用量总览</a>
+              核对后填这里，之后继续自动累加。不消耗任何额度。
+            </p>
+          </div>
+          <div style="grid-column:1/-1;display:flex;gap:9px;flex-wrap:wrap;align-items:center">
+            <button class="ghost small" id="btnSaveQuota" type="button">保存额度设置</button>
+            <button class="ghost small" id="btnClearCalibration" type="button">清除校准</button>
+            <button class="ghost small" id="btnResetUsage" type="button">清空本地账本</button>
+            <span class="kv" id="usageFile"></span>
+          </div>
+        </div>
+      </details>
+
+      <div class="kv" id="cfgPaths" style="margin-top:16px"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const nativeFetch = window.fetch.bind(window);
+let accessToken = '';
+async function apiFetch(url, options = {}) {
+  const headers = new Headers(options.headers || {});
+  if (accessToken) headers.set('Authorization', 'Bearer ' + accessToken);
+  const r = await nativeFetch(url, { ...options, headers });
+  if (r.status === 401 && !accessToken && !document.querySelector('#authDialog').open) document.querySelector('#authDialog').showModal();
+  return r;
+}
+document.querySelector('#authBtn').onclick = () => document.querySelector('#authDialog').showModal();
+document.querySelector('#authSubmit').onclick = () => {
+  accessToken = document.querySelector('#authInput').value.trim();
+  document.querySelector('#authInput').value = '';
+  setTimeout(() => { loadConfig(); loadUsage(); loadHistory(); }, 0);
+};
+
+const $ = (s) => document.querySelector(s);
+const input = $('#input'), runBtn = $('#runBtn'), errBox = $('#error'), resultBox = $('#result');
+const ARC = 2 * Math.PI * 64;
+let last = null;
+// 本次检测实际提交的原文。全文视图必须用它——
+// 上游在 is_merge（默认）下只给一个粗粒度段，靠分段拼不出原文。
+let lastSourceText = '';
+let MCP_PATH = '';
+
+const VERDICT_COLOR = {
+  human: '#3fb950', mostly_human: '#39c5cf', mixed: '#d29922', likely_ai: '#f0883e', ai: '#f85149'
+};
+
+// ---- 字数统计 ----
+function syncCount() {
+  // 按码点计数，emoji / 代理对不会被算成 2 个字（与服务端的 chars 口径一致）
+  const n = [...input.value].length;
+  const c = $('#count');
+  c.textContent = `${n} 字`;
+  c.classList.toggle('warn', n > 0 && n < 120);
+  if (n > 0 && n < 120) c.textContent += '（偏短，结论可能不稳）';
+}
+
+// ---- Tab 切换 ----
+document.querySelectorAll('.tabs button').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b));
+    $('#pane-visual').classList.toggle('hidden', b.dataset.tab !== 'visual');
+    $('#pane-agent').classList.toggle('hidden', b.dataset.tab !== 'agent');
+  });
+});
+
+// ---- 交互 ----
+input.addEventListener('input', syncCount);
+input.addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); run(); }
+});
+let runGeneration = 0;
+$('#clearBtn').onclick = () => { runGeneration++; input.value = ''; last = null; lastSourceText = ''; syncCount(); resultBox.classList.add('hidden'); errBox.classList.add('hidden'); input.focus(); };
+$('#pasteBtn').onclick = async () => {
+  try { input.value = await navigator.clipboard.readText(); syncCount(); } catch { alert('读取剪贴板失败，请手动粘贴'); }
+};
+$('#sampleBtn').onclick = () => {
+  input.value = `人工智能技术的快速发展正在深刻改变着我们的生活方式。从智能语音助手到自动驾驶汽车，从医疗影像诊断到金融风险控制，AI 的应用场景不断拓展。\n\n值得注意的是，人工智能的发展也带来了一系列挑战。首先是就业结构的变化，部分传统岗位可能被自动化取代。其次是数据隐私和安全问题，如何在享受便利的同时保护个人信息成为重要议题。此外，算法偏见也是一个不容忽视的问题。\n\n综上所述，我们应当以开放而审慎的态度拥抱人工智能技术，在推动创新的同时建立健全的监管框架，确保技术发展真正造福于人类社会。`;
+  syncCount();
+};
+$('#copyJson').onclick = () => { navigator.clipboard.writeText($('#jsonOut').textContent); flash($('#copyJson'), '已复制'); };
+$('#copyCurl').onclick = () => { navigator.clipboard.writeText($('#curlBox').textContent); flash($('#copyCurl'), '已复制'); };
+$('#dlJson').onclick = () => {
+  const blob = new Blob([$('#jsonOut').textContent], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `zhuque-result-${Date.now()}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+function flash(btn, msg) { const t = btn.textContent; btn.textContent = msg; setTimeout(() => { btn.textContent = t; }, 1300); }
+
+// ---- 检测 ----
+async function run() {
+  if (runBtn.disabled) return;
+  const text = input.value;
+  if (!text.trim()) { showError('请先输入待检测的文本。'); input.focus(); return; }
+  errBox.classList.add('hidden');
+  const old = runBtn.innerHTML;
+  runBtn.disabled = true;
+  runBtn.innerHTML = '<span class="spin"></span>检测中…';
+  const t0 = performance.now();
+  const generation = ++runGeneration;
+  try {
+    const res = await apiFetch('/api/detect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, is_merge: $('#merge').checked, source: 'web' })
+    });
+    const payload = await res.json();
+    if (!payload.ok) throw new Error(`[${payload.error.code}] ${payload.error.message}\n${payload.error.hint || ''}`);
+    if (generation === runGeneration) render(payload.data, Math.round(performance.now() - t0), text);
+    loadUsage(); // 检测会消耗额度，顺手刷新用量（状态栏的剩余额度也来自这里）
+    loadHistory();
+  } catch (e) {
+    if (generation === runGeneration) showError(e.message || String(e));
+  } finally {
+    runBtn.disabled = false;
+    runBtn.innerHTML = old;
+  }
+}
+runBtn.onclick = run;
+
+function showError(msg) {
+  errBox.textContent = msg;
+  errBox.classList.remove('hidden');
+}
+
+function render(d, elapsed, sourceText) {
+  last = d;
+  lastSourceText = typeof sourceText === 'string' ? sourceText : '';
+  resultBox.classList.remove('hidden');
+  const color = VERDICT_COLOR[d.verdict] || '#4d9fff';
+
+  // 仪表盘
+  const pctv = Math.max(0, Math.min(1, d.ai_rate));
+  $('#gaugeNum').textContent = d.ai_rate_percent.toFixed(1) + '%';
+  $('#gaugeNum').style.color = color;
+  const arc = $('#arc');
+  arc.style.stroke = color;
+  arc.setAttribute('stroke-dasharray', String(ARC));
+  arc.setAttribute('stroke-dashoffset', String(ARC));
+  requestAnimationFrame(() => arc.setAttribute('stroke-dashoffset', String(ARC * (1 - pctv))));
+
+  // 结论徽章（文案统一走 escapeHtml，不因为「是后端枚举」就破例）
+  const badge = $('#badge');
+  badge.style.color = color;
+  badge.style.background = hexA(color, 0.13);
+  badge.innerHTML = `${escapeHtml(d.verdict_name)} <span class="k">${escapeHtml(d.verdict)}</span>`;
+  $('#advice').textContent = d.advice + `（模型置信度 ${(d.ai_probability * 100).toFixed(2)}%）`;
+
+  // 指标
+  const metrics = [
+    ['人工率', d.human_rate_percent.toFixed(2) + '%'],
+    ['模型置信度', (d.ai_probability * 100).toFixed(2) + '%'],
+    ['风险占比', (d.risk_rate * 100).toFixed(2) + '%'],
+    ['综合风险分', (d.risk_score * 100).toFixed(2) + '%'],
+    ['分段数', String(d.segment_count)],
+    ['标记段数', String(d.flagged_segment_count)],
+    ['计费 token', String(d._meta.usage.makers_billed_tokens)],
+    ['耗时', elapsed + ' ms'],
+  ];
+  $('#metrics').innerHTML = metrics.map(([l, v]) => `<div class="metric"><div class="m-l">${l}</div><div class="m-v">${v}</div></div>`).join('');
+
+  // 三段占比（对齐官网：人工特征 / 疑似 AI / AI 特征）
+  renderCatCards(d);
+
+  // 检测全文（完整展示，不截断）
+  const segsForText = d.segments && d.segments.length ? d.segments : (d.flagged_segments || []);
+  mountFullView({
+    boxId: 'fullText', statId: 'fullStat', toggleId: 'fullToggle',
+    copyId: 'fullCopy', dlId: 'fullDl',
+    text: lastSourceText, segments: segsForText,
+    note: d._meta && d._meta.chunked ? `已分 ${d._meta.chunk_count} 块检测` : '',
+  });
+  $('#fullCount').textContent = lastSourceText ? `· ${[...lastSourceText].length} 字` : '';
+
+  // 逐段归属
+  const segs = segsForText;
+  $('#segCount').textContent = segs.length ? `· 共 ${segs.length} 段，${d.flagged_segment_count} 段未被判为人工` : '';
+  lastSegs = segs;
+  applySegFilter();
+  // History is refreshed once by run().
+
+  // 告警
+  const warns = d.warnings || [];
+  const warnHtml = warns.map(w => `<div class="warnbox">⚠ ${escapeHtml(w.message)}${w.hint ? '  ' + escapeHtml(w.hint) : ''}</div>`).join('');
+  errBox.classList.add('hidden');
+  let holder = $('#warnHolder');
+  if (!holder) { holder = document.createElement('div'); holder.id = 'warnHolder'; resultBox.insertBefore(holder, resultBox.firstChild); }
+  holder.innerHTML = warnHtml;
+
+  // JSON
+  $('#jsonOut').textContent = JSON.stringify(d, null, 2);
+
+  // Agent 代码块
+  const origin = location.origin;
+  $('#curlBox').textContent =
+`curl -s -X POST ${origin}/api/detect \\
+  -H 'Content-Type: application/json' \\
+  -d '{"text":"待检测文本","is_merge":true}'`;
+  $('#mcpBox').textContent = JSON.stringify({ mcpServers: { 'zhuque-detect': { command: 'node', args: [MCP_PATH || '<见 /api/mcp-config>'] } } }, null, 2);
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function hexA(hex, a) {
+  const h = hex.replace('#', '');
+  const n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+}
+
+/* ==================================================================
+   检测全文：把原文完整画出来，并按段着色。任何情况下都不截断。
+   ================================================================== */
+
+/** 取出各段的区间。分块检测时 global_position 才是相对整篇的绝对位置。 */
+function segSpans(segments) {
+  const spans = [];
+  for (const s of segments || []) {
+    const p = s.global_position || s.position;
+    if (!Array.isArray(p) || p.length < 2) continue;
+    const start = Math.max(0, Number(p[0]) || 0);
+    const end = Math.max(0, Number(p[1]) || 0);
+    if (!(end > start)) continue;
+    spans.push({
+      start, end,
+      label: Number(s.label ?? 1),
+      name: s.label_name || '',
+      conf: Number(s.confidence ?? 0),
+    });
+  }
+  // 区间可能有重叠，排序后按下标推进，保证每段字符只出现一次
+  spans.sort((a, b) => a.start - b.start);
+  return spans;
+}
+
+function buildFullHtml(text, segments) {
+  const spans = segSpans(segments).filter(s => s.start < text.length);
+  if (!spans.length) return escapeHtml(text);
+  let html = '';
+  let cursor = 0;
+  for (const s of spans) {
+    const start = Math.min(s.start, text.length);
+    const end = Math.min(s.end, text.length);
+    if (start > cursor) html += escapeHtml(text.slice(cursor, start));
+    const from = Math.max(cursor, start);
+    if (end > from) {
+      const lv = (s.label >= 0 && s.label <= 2) ? s.label : 1;
+      const tip = `${s.name || '未知'} · 置信度 ${(s.conf * 100).toFixed(2)}%`;
+      html += `<span class="ft-seg s${lv}" title="${escapeHtml(tip)}">${escapeHtml(text.slice(from, end))}</span>`;
+      cursor = end;
+    }
+  }
+  if (cursor < text.length) html += escapeHtml(text.slice(cursor));
+  return html;
+}
+
+/**
+ * 把全文视图挂到指定容器上。结果面板与历史详情共用这一份逻辑，
+ * 只靠传入的元素 id 区分，避免两处各写一遍导致行为漂移。
+ */
+function mountFullView({ boxId, statId, toggleId, copyId, dlId, text, segments, note }) {
+  const box = document.getElementById(boxId);
+  if (!box) return;
+  const body = typeof text === 'string' ? text : '';
+  const spans = segSpans(segments);
+  let mode = 'hl';
+  box.classList.remove('plain');
+  box.innerHTML = buildFullHtml(body, segments);
+
+  const stat = document.getElementById(statId);
+  if (stat) {
+    stat.textContent = body
+      ? `${[...body].length} 字 · ${spans.length} 个被标注区间${note ? ' · ' + note : ''}`
+      : '没有可展示的文本';
+  }
+
+  const toggle = document.getElementById(toggleId);
+  if (toggle) {
+    toggle.textContent = '切换为纯文本';
+    toggle.style.display = body ? '' : 'none';
+    toggle.onclick = () => {
+      mode = mode === 'hl' ? 'plain' : 'hl';
+      box.classList.toggle('plain', mode === 'plain');
+      box.innerHTML = mode === 'hl' ? buildFullHtml(body, segments) : escapeHtml(body);
+      toggle.textContent = mode === 'hl' ? '切换为纯文本' : '切换为高亮';
+    };
+  }
+
+  const copy = document.getElementById(copyId);
+  if (copy) {
+    copy.style.display = body ? '' : 'none';
+    copy.onclick = () => { navigator.clipboard.writeText(body); flash(copy, '已复制'); };
+  }
+
+  const dl = document.getElementById(dlId);
+  if (dl) {
+    dl.style.display = body ? '' : 'none';
+    dl.onclick = () => {
+      const blob = new Blob([body], { type: 'text/plain;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `zhuque-text-${Date.now()}.txt`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    };
+  }
+}
+
+/* ---- 三段占比卡片（对齐朱雀官网口径：人工特征 / 疑似 AI / AI 特征）---- */
+function renderCatCards(d) {
+  const cats = d.categories || {
+    human: { percent: d.composition ? d.composition.human * 100 : 0, chars: 0, segments: 0 },
+    suspected_ai: { percent: d.composition ? d.composition.suspected_ai * 100 : 0, chars: 0, segments: 0 },
+    ai: { percent: d.composition ? d.composition.ai * 100 : 0, chars: 0, segments: 0 },
+    basis: 'labels_ratio',
+  };
+  const ch = Number(cats.human?.percent ?? 0);
+  const cs = Number(cats.suspected_ai?.percent ?? 0);
+  const ca = Number(cats.ai?.percent ?? 0);
+  $('#barHuman').style.width = ch + '%';
+  $('#barSus').style.width = cs + '%';
+  $('#barAi').style.width = ca + '%';
+  $('#lgHuman').textContent = ch.toFixed(2) + '%';
+  $('#lgSus').textContent = cs.toFixed(2) + '%';
+  $('#lgAi').textContent = ca.toFixed(2) + '%';
+  $('#catBasis').textContent = cats.basis === 'segment_chars' ? '按逐段字符数统计' : '按模型整体占比';
+  $('#catHumanVal').textContent = ch.toFixed(2) + '%';
+  $('#catSusVal').textContent = cs.toFixed(2) + '%';
+  $('#catAiVal').textContent = ca.toFixed(2) + '%';
+  $('#catHumanSub').textContent = `${cats.human?.segments ?? 0} 段 / ${fmtNum(cats.human?.chars ?? 0)} 字`;
+  $('#catSusSub').textContent = `${cats.suspected_ai?.segments ?? 0} 段 / ${fmtNum(cats.suspected_ai?.chars ?? 0)} 字`;
+  $('#catAiSub').textContent = `${cats.ai?.segments ?? 0} 段 / ${fmtNum(cats.ai?.chars ?? 0)} 字`;
+  const total = Number(d.ai_rate_percent ?? (cs + ca));
+  $('#catNote').textContent = `总 AI 率 = AI 特征 ${ca.toFixed(2)}% + 疑似 AI ${cs.toFixed(2)}% = ${total.toFixed(2)}%`;
+  return cats;
+}
+
+/* ---- 逐段归属渲染与筛选 ---- */
+let lastSegs = [];
+let segFilterKey = 'all';
+
+function renderSegs(segs) {
+  if (!segs.length) return '<div class="hist-empty">没有符合条件的段落。</div>';
+  return segs.map(s => {
+    const p = s.global_position || s.position;
+    const pos = p ? `[${Number(p[0])}, ${Number(p[1])})` : '';
+    const cat = s.category || s.label_key || 'ai';
+    const catName = s.label_name || ({ human: '人工特征', suspected_ai: '疑似 AI', ai: 'AI 特征' }[cat] || cat);
+    return `<div class="seg s${[0,1,2].includes(s.label) ? s.label : 1}" data-cat="${escapeHtml(cat)}">
+      <div class="seg-head">
+        <span>#${Number(s.order ?? s.index) || 0}</span>
+        <span class="sev s${[0,1,2].includes(s.label) ? s.label : 1}">${escapeHtml(catName)}</span>
+        <span>置信度 ${((s.confidence ?? 0) * 100).toFixed(2)}%</span>
+        <span class="mono-pos">${pos}</span>
+        ${s.chars ? `<span class="mono-pos">${Number(s.chars) || 0} 字</span>` : ''}
+        ${s.chunk_index > 1 ? `<span class="mono-pos">第 ${s.chunk_index} 块</span>` : ''}
+      </div>
+      <div class="seg-body">${escapeHtml(s.excerpt)}</div>
+    </div>`;
+  }).join('');
+}
+
+function applySegFilter() {
+  const map = {
+    all: () => true,
+    ai: s => (s.category || s.label_key) === 'ai',
+    suspected_ai: s => (s.category || s.label_key) === 'suspected_ai',
+    flagged: s => s.label !== 0,
+    human: s => (s.category || s.label_key) === 'human',
+  };
+  const fn = map[segFilterKey] || map.all;
+  const list = lastSegs.filter(fn);
+  $('#segs').innerHTML = renderSegs(list);
+}
+
+document.querySelectorAll('#segFilter button').forEach(b => {
+  b.onclick = () => {
+    segFilterKey = b.dataset.f;
+    document.querySelectorAll('#segFilter button').forEach(x => x.classList.toggle('on', x === b));
+    applySegFilter();
+  };
+});
+
+/* ==================================================================
+   检测历史
+   ================================================================== */
+const VERDICT_COLOR_MAP = { human: '#3fb950', mostly_human: '#39c5cf', mixed: '#d29922', likely_ai: '#f0883e', ai: '#f85149' };
+
+async function loadHistory() {
+  const params = new URLSearchParams({ limit: '30' });
+  const q = $('#histSearch').value.trim();
+  if (q) params.set('q', q);
+  const v = $('#histVerdict').value;
+  if (v) params.set('verdict', v);
+  const s = $('#histSource').value;
+  if (s) params.set('source', s);
+  try {
+    const [listRes, statRes] = await Promise.all([
+      apiFetch('/api/history?' + params.toString()).then(r => r.json()),
+      apiFetch('/api/history/stats').then(r => r.json()),
+    ]);
+    if (!listRes.ok) throw new Error(listRes.error?.message || '读取历史失败');
+    renderHistoryList(listRes.data);
+    if (statRes.ok) renderHistStats(statRes.data);
+  } catch (e) {
+    $('#histList').innerHTML = `<div class="hist-empty">读取历史失败：${escapeHtml(e.message || e)}</div>`;
+  }
+}
+
+function renderHistStats(st) {
+  const el = $('#histStats');
+  if (!st.count) { el.textContent = '暂无记录'; return; }
+  const a = st.average || {};
+  el.textContent = `共 ${st.count} 条 · 平均 AI 率 ${a.ai_rate_percent ?? 0}% · 平均人工特征 ${a.human_percent ?? 0}%`;
+}
+
+function renderHistoryList(data) {
+  const box = $('#histList');
+  if (!data.items.length) {
+    box.innerHTML = '<div class="hist-empty">还没有检测记录。检测一次就会自动存入历史。</div>';
+    return;
+  }
+  box.innerHTML = data.items.map(r => {
+    const c = r.categories || {};
+    const color = VERDICT_COLOR_MAP[r.verdict] || '#4d9fff';
+    const h = Number(c.human?.percent ?? 0), sa = Number(c.suspected_ai?.percent ?? 0), ai = Number(c.ai?.percent ?? 0);
+    return `<div class="hist-item" data-id="${escapeHtml(r.id)}">
+      <div class="hist-top">
+        <span class="h-rate" style="color:${color}">${Number(r.ai_rate_percent) || 0}%</span>
+        <span style="color:${color}">${escapeHtml(r.verdict_name || '')}</span>
+        <span class="hist-src">${escapeHtml(r.source || '')}</span>
+        <span>${Number(r.chars) || 0} 字 · ${Number(r.segment_count) || 0} 段</span>
+        <span style="margin-left:auto">${escapeHtml(r.at_local || '')}</span>
+      </div>
+      <div class="hist-mini">
+        <div style="width:${h}%;background:#3fb950"></div>
+        <div style="width:${sa}%;background:#d29922"></div>
+        <div style="width:${ai}%;background:#f85149"></div>
+      </div>
+      <div class="hist-preview">${escapeHtml(r.preview || '')}</div>
+    </div>`;
+  }).join('');
+
+  box.querySelectorAll('.hist-item').forEach(el => {
+    el.onclick = () => showHistoryDetail(el.dataset.id);
+  });
+}
+
+async function showHistoryDetail(id) {
+  const box = $('#histDetail');
+  box.classList.remove('hidden');
+  box.innerHTML = '加载中…';
+  try {
+    const j = await (await apiFetch('/api/history/' + encodeURIComponent(id))).json();
+    if (!j.ok) throw new Error(j.error?.message || '读取失败');
+    const r = j.data;
+    const c = r.categories || {};
+    const segs = r.segments || [];
+    box.innerHTML = `
+      <div class="hist-top" style="margin-bottom:10px">
+        <span class="h-rate" style="color:${VERDICT_COLOR_MAP[r.verdict] || '#4d9fff'}">${Number(r.ai_rate_percent) || 0}%</span>
+        <span>${escapeHtml(r.verdict_name || '')}</span>
+        <span class="hist-src">${escapeHtml(r.source || '')}</span>
+        <span>${Number(r.chars) || 0} 字 · ${Number(r.segment_count) || 0} 段 · ${escapeHtml(r.at_local || '')}</span>
+        <span style="margin-left:auto"><button class="ghost small" id="histCopy">复制 id</button>
+        <button class="ghost small" id="histUse">载入到输入框</button>
+        <button class="ghost small" id="histDel">删除该条</button></span>
+      </div>
+      <div class="cat-cards" style="margin-top:0">
+        <div class="cat human"><div class="c-name">人工特征</div><div class="c-val">${(c.human?.percent ?? 0).toFixed(2)}%</div><div class="c-sub">${c.human?.segments ?? 0} 段 / ${fmtNum(c.human?.chars ?? 0)} 字</div></div>
+        <div class="cat suspected_ai"><div class="c-name">疑似 AI</div><div class="c-val">${(c.suspected_ai?.percent ?? 0).toFixed(2)}%</div><div class="c-sub">${c.suspected_ai?.segments ?? 0} 段 / ${fmtNum(c.suspected_ai?.chars ?? 0)} 字</div></div>
+        <div class="cat ai"><div class="c-name">AI 特征</div><div class="c-val">${(c.ai?.percent ?? 0).toFixed(2)}%</div><div class="c-sub">${c.ai?.segments ?? 0} 段 / ${fmtNum(c.ai?.chars ?? 0)} 字</div></div>
+      </div>
+      <div class="ft-bar" style="margin-top:14px">
+        <div class="ft-stat" id="histFullStat">—</div>
+        <span class="spacer"></span>
+        <button class="ghost small" id="histFullToggle">切换为纯文本</button>
+        <button class="ghost small" id="histFullCopy">复制全文</button>
+        <button class="ghost small" id="histFullDl">下载 .txt</button>
+      </div>
+      <div class="fulltext" id="histFullText"></div>
+      <details style="margin-top:14px">
+        <summary>逐段归属${segs.length ? `（共 ${segs.length} 段，全部列出）` : ''}</summary>
+        <div style="padding:12px 15px 16px">
+          ${segs.length ? renderSegs(segs) : '<div class="hist-empty">该记录未保存分段明细。</div>'}
+        </div>
+      </details>
+      <div class="pagehelp">文本${r.text ? '已完整保存' : '未保存原文（该记录写入时限制了长度）'} · Key ${escapeHtml(r.key?.masked || r.key?.label || '未知')} · 计费 ${fmtNum(r.usage?.billed_tokens ?? 0)} token · 耗时 ${Number(r.duration_ms) || 0}ms</div>
+    `;
+    // 历史详情同样给全文：靠分段拼不出原文，优先用记录里存的 text
+    mountFullView({
+      boxId: 'histFullText', statId: 'histFullStat', toggleId: 'histFullToggle',
+      copyId: 'histFullCopy', dlId: 'histFullDl',
+      text: r.text || [r.head, '……', r.tail].filter(Boolean).join('\n'),
+      segments: r.text ? segs : [],
+      note: r.text ? '原文完整保存' : '原文未保存，以下仅为首尾预览',
+    });
+    $('#histCopy').onclick = () => { navigator.clipboard.writeText(r.id); flash($('#histCopy'), '已复制'); };
+    $('#histUse').onclick = () => {
+      const t = r.text || [r.head, '……', r.tail].filter(Boolean).join('\n');
+      input.value = t; syncCount(); window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    $('#histDel').onclick = async () => {
+      if (!confirm('确定删除这条历史记录？')) return;
+      const d = await (await apiFetch('/api/history/' + encodeURIComponent(id), { method: 'DELETE' })).json();
+      if (d.ok) { box.classList.add('hidden'); loadHistory(); }
+    };
+  } catch (e) {
+    box.innerHTML = `<div class="notice err">读取失败：${escapeHtml(e.message || e)}</div>`;
+  }
+}
+
+$('#histRefresh').onclick = () => loadHistory();
+$('#histSearch').oninput = debounce(loadHistory, 350);
+$('#histVerdict').onchange = loadHistory;
+$('#histSource').onchange = loadHistory;
+async function downloadHistory(format) {
+  try {
+    const res = await apiFetch('/api/history/export?format=' + format);
+    if (!res.ok) throw new Error('历史导出失败，请检查服务访问令牌。');
+    const url = URL.createObjectURL(await res.blob());
+    const a = document.createElement('a'); a.href = url; a.download = `zhuque-history.${format}`; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (e) { showError(e.message || String(e)); }
+}
+$('#histExportJson').onclick = () => downloadHistory('json');
+$('#histExportCsv').onclick = () => downloadHistory('csv');
+$('#histClear').onclick = async () => {
+  if (!confirm('确定清空全部检测历史吗？此操作不可恢复。')) return;
+  const j = await (await apiFetch('/api/history/clear', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json();
+  if (j.ok) { $('#histDetail').classList.add('hidden'); loadHistory(); }
+};
+
+function debounce(fn, ms) {
+  let t = null;
+  return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+}
+
+/* ==================================================================
+   API Key 池
+   ================================================================== */
+let POOL = null;
+
+async function loadKeyPool() {
+  try {
+    const j = await (await apiFetch('/api/keys')).json();
+    if (!j.ok) throw new Error(j.error?.message || '读取 Key 池失败');
+    POOL = j.data.pool || j.data;
+    renderPoolOrPending(j.data.state_file || POOL.storage?.state);
+  } catch (e) {
+    $('#keyPoolList').innerHTML = `<div class="notice err">${escapeHtml(e.message || e)}</div>`;
+  }
+}
+
+/**
+ * 渲染 Key 池。
+ * 若存在尚未保存的编辑（newKeys / pendingKeys），一律优先渲染待保存视图——
+ * 否则一次后台刷新就会把用户刚添加的 Key「刷没了」，看起来像点了没反应。
+ */
+function renderPoolOrPending(stateFile) {
+  if (newKeys.length || pendingKeys !== null) {
+    pendingKeys = pendingKeys || currentKeys();
+    renderPending();
+    return;
+  }
+  renderKeyPool(POOL, stateFile);
+}
+
+function renderKeyPool(p, stateFile) {
+  const list = $('#keyPoolList');
+  if (!p || !p.count) {
+    list.innerHTML = `<div class="notice info">还没有配置 Key 池。可在下方添加多把 Key；也可以只在上面的「朱雀 API Key」里填一把单 Key。</div>`;
+  } else {
+    list.innerHTML = p.keys.map(k => {
+      const st = k.available ? 'ok' : (k.unavailable_reason === 'cooling_down' ? 'cool' : k.unavailable_reason === 'disabled_by_user' ? 'off' : 'bad');
+      const stTxt = k.available
+        ? '可用'
+        : k.unavailable_reason === 'cooling_down'
+          ? `冷却中（至 ${(k.cooldown_until || '').slice(11, 19)}）`
+          : k.unavailable_reason === 'disabled_by_user'
+            ? '已停用'
+            : '已失效';
+      return `<div class="keypool-row">
+        <div class="kp-main">
+          <div class="kp-label">${escapeHtml(k.label)} <span class="mono-pos">${escapeHtml(k.masked)}</span></div>
+          <div class="kp-meta">账号 ${escapeHtml(k.account || '未分组')} · 已用 ${fmtNum(k.used_tokens)} token · 调用 ${k.calls} 次 · 成功 ${k.ok} / 失败 ${k.fail}${k.last_used_at ? ' · 最近 ' + k.last_used_at.slice(11, 19) : ''}</div>
+          ${k.last_error ? `<div class="kp-meta" style="color:#ff8078">最近错误：${escapeHtml(k.last_error.code || '')} ${escapeHtml((k.last_error.message || '').slice(0, 60))}</div>` : ''}
+        </div>
+        <span class="kstatus ${st}">${stTxt}</span>
+        <button class="ghost small" data-kp-toggle="${escapeHtml(k.id)}" data-en="${k.enabled ? 'false' : 'true'}">${k.enabled ? '停用' : '启用'}</button>
+        <button class="ghost small" data-kp-del="${escapeHtml(k.id)}">删除</button>
+      </div>`;
+    }).join('');
+
+    list.querySelectorAll('[data-kp-toggle]').forEach(b => {
+      b.onclick = async () => {
+        const j = await (await apiFetch('/api/keys/toggle', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: b.dataset.kpToggle, enabled: b.dataset.en === 'true' }),
+        })).json();
+        if (!j.ok) setTestResult('bad', `[${j.error.code}] ${j.error.message}`);
+        else { setTestResult('ok', '已更新该 Key 的启用状态。'); loadKeyPool(); }
+      };
+    });
+    list.querySelectorAll('[data-kp-del]').forEach(b => {
+      b.onclick = () => {
+        pendingKeys = (currentKeys() || []).filter(k => k.id !== b.dataset.kpDel);
+        renderPending();
+        saveKeyPool('已从池中移除该 Key');
+      };
+    });
+  }
+  $('#kpStorage').textContent = stateFile ? `状态：${stateFile}` : '';
+}
+
+/** 从服务端当前池构造可编辑副本（含掩码，但不含明文） */
+function currentKeys() {
+  if (!POOL || !POOL.keys) return [];
+  return POOL.keys.map(k => ({ id: k.id, label: k.label, key: '', account: k.account || '', masked: k.masked, enabled: k.enabled, _masked: true }));
+}
+let pendingKeys = null;
+let newKeys = [];
+
+function renderPending() {
+  if (!pendingKeys) return;
+  const list = $('#keyPoolList');
+  list.innerHTML = pendingKeys.map(k => `
+    <div class="keypool-row">
+      <div class="kp-main"><div class="kp-label">${escapeHtml(k.label)} <span class="mono-pos">${escapeHtml(k.key ? mask(k.key) : (k.masked || '(未填)'))}</span></div>
+      <div class="kp-meta">${k.key ? '新增待保存' : '已保存（留空表示不改密钥）'}</div></div>
+    </div>`).join('') + newKeys.map((k, i) => `
+    <div class="keypool-row">
+      <div class="kp-main"><div class="kp-label">${escapeHtml(k.label)} <span class="mono-pos">${escapeHtml(mask(k.key))}</span></div>
+      <div class="kp-meta">新增（待保存）</div></div>
+      <button class="ghost small" data-kp-newdel="${i}">移除</button>
+    </div>`).join('') || '<div class="notice info">池为空。</div>';
+  list.querySelectorAll('[data-kp-newdel]').forEach(b => {
+    b.onclick = () => { newKeys.splice(Number(b.dataset.kpNewdel), 1); renderPending(); };
+  });
+}
+
+const mask = (k) => (k && k.length > 10 ? `${k.slice(0, 6)}...${k.slice(-4)}` : '***');
+
+$('#kpAdd').onclick = () => {
+  const raw = $('#kpNewKey').value.trim();
+  const labelInput = $('#kpNewLabel').value.trim();
+  const account = $('#kpNewAccount').value.trim();
+  if (!raw) { setTestResult('bad', '请先粘贴要添加的 Key。'); return; }
+  // 逗号 / 换行分隔可一次加多把（与粘贴行为一致，手动输入也支持）
+  const parts = raw.split(/[,\n]/).map(s => s.trim()).filter(Boolean);
+  if (!parts.length) { setTestResult('bad', '请先粘贴要添加的 Key。'); return; }
+  const bad = parts.find(p => /\s/.test(p));
+  if (bad) { setTestResult('bad', 'Key 中不应包含空格。'); return; }
+  parts.forEach((key, i) => {
+    newKeys.push({
+      key, account,
+      label: labelInput
+        ? (parts.length > 1 ? `${labelInput}-${i + 1}` : labelInput)
+        : `Key ${newKeys.length + 1}`,
+    });
+  });
+  $('#kpNewKey').value = ''; $('#kpNewLabel').value = '';
+  pendingKeys = pendingKeys || currentKeys();
+  renderPending();
+  setTestResult('busy', `已暂存 ${newKeys.length} 把新 Key，点「保存 Key 池」生效。`);
+};
+
+$('#kpNewKey').addEventListener('paste', (e) => {
+  const t = (e.clipboardData || window.clipboardData)?.getData('text') || '';
+  if (/[,\n]/.test(t.trim())) {
+    e.preventDefault();
+    const parts = t.split(/[,\n]/).map(s => s.trim()).filter(Boolean);
+    for (const p of parts) newKeys.push({ key: p, account: $('#kpNewAccount').value.trim(), label: `Key ${newKeys.length + 1}` });
+    pendingKeys = pendingKeys || currentKeys();
+    renderPending();
+    setTestResult('busy', `检测到多把 Key，已一次暂存 ${parts.length} 把，点「保存 Key 池」生效。`);
+  }
+});
+
+function saveKeyPool(msg) {
+  const base = (pendingKeys || currentKeys()).map(k => ({
+    id: k.id, label: k.label, account: k.account || '', enabled: k.enabled !== false,
+    ...(k.key ? { key: k.key } : {}),
+    ...(k._masked ? { _keep: true } : {}),
+  }));
+  // 需要保留原有密钥的项，服务端支持「不带 key 则沿用原值」的语义
+  const merged = base.concat(newKeys.map((k, i) => ({ id: `new${Date.now()}${i}`, label: k.label, account: k.account || '', key: k.key, enabled: true })));
+  return apiFetch('/api/keys', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ api_keys: merged }),
+  }).then(r => r.json()).then(j => {
+    if (!j.ok) throw new Error(`[${j.error.code}] ${j.error.message}${j.error.hint ? ' — ' + j.error.hint : ''}`);
+    newKeys = []; pendingKeys = null;
+    POOL = j.data.pool;
+    renderKeyPool(POOL, j.data.pool?.storage?.state || j.data.state_file);
+    if (msg) setTestResult('ok', msg + '（Key 池已保存）');
+    loadConfig();
+    return j;
+  }).catch(e => { setTestResult('bad', e.message || String(e)); });
+}
+
+$('#kpSave').onclick = () => saveKeyPool('✓ 已保存');
+$('#kpReset').onclick = async () => {
+  const j = await (await apiFetch('/api/keys/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json();
+  if (!j.ok) { setTestResult('bad', j.error?.message || '失败'); return; }
+  POOL = j.data;
+  renderPoolOrPending(j.data.storage?.state);
+  setTestResult('ok', '✓ 已重置所有 Key 的冷却与失效状态（密钥不变）。');
+};
+
+function renderMcpBox() {
+  $('#mcpBox').textContent = JSON.stringify({ mcpServers: { 'zhuque-detect': { command: 'node', args: [MCP_PATH || '<见 /api/mcp-config>'] } } }, null, 2);
+}
+
+// 从服务端取真实的 MCP 入口路径（服务地址与端口变化时仍然正确）
+apiFetch('/api/mcp-config')
+  .then(r => (r.ok ? r.json() : null))
+  .then(cfg => {
+    if (cfg?.snippet) {
+      MCP_PATH = cfg.snippet.mcpServers?.['zhuque-detect']?.args?.[0] || '';
+      // 拿到路径后刷新，避免覆盖已渲染的内容
+      renderMcpBox();
+    }
+  })
+  .catch(() => renderMcpBox());
+
+/* ==================================================================
+   用量面板
+   ================================================================== */
+const fmtNum = (n) => Number(n || 0).toLocaleString('en-US');
+const fmtTime = (iso) => (iso ? new Date(iso).toLocaleTimeString('zh-CN', { hour12: false }) : '—');
+const usageColor = (ratio) => (ratio < 0.5 ? '#3fb950' : ratio < 0.8 ? '#d29922' : '#f85149');
+
+let usageTimer = null;
+
+async function loadUsage() {
+  try {
+    const r = await apiFetch('/api/usage?days=7');
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error?.message || '读取失败');
+    renderUsage(j.data);
+  } catch (e) {
+    $('#usageSub').textContent = '用量读取失败：' + (e.message || e);
+  }
+}
+
+function renderUsage(u) {
+  const color = usageColor(u.used.ratio);
+  $('#usageRemaining').textContent = fmtNum(u.remaining.tokens);
+  $('#usageRemaining').style.color = color;
+  const pct = $('#usagePct');
+  pct.textContent = `已用 ${u.used.percent}%`;
+  pct.style.color = color;
+  pct.style.borderColor = hexA(color, 0.45);
+
+  $('#usageBar').style.width = (u.used.ratio * 100).toFixed(2) + '%';
+  $('#usageBar').style.background = `linear-gradient(90deg, ${color}, ${hexA(color, 0.55)})`;
+
+  $('#usageCycle').textContent = `额度 ${fmtNum(u.quota_per_month)} / 月 · 账期 ${u.cycle.start} → ${u.cycle.end}`;
+  $('#usageSub').innerHTML =
+    `已用 <b>${fmtNum(u.used.billed_tokens)}</b> token · ${fmtNum(u.used.calls)} 次调用` +
+    (u.calibration ? ' · <span style="color:var(--warn)">已按控制台校准</span>' : '') +
+    `<br>本地累计统计，权威数据见 <a href="https://console.cloud.tencent.com/edgeone/makers?tab=models&subTab=overview" target="_blank" rel="noreferrer">控制台用量总览</a>`;
+
+  const peak = Math.max(1, ...u.daily.map(d => d.billed));
+  $('#usageSpark').innerHTML = u.daily.map(d =>
+    `<i style="height:${Math.max(3, Math.round((d.billed / peak) * 44))}px" data-tip="${d.date} · ${fmtNum(d.billed)} token · ${d.calls} 次"></i>`
+  ).join('');
+
+  const stats = [
+    ['今日', fmtNum(u.today.billed_tokens)],
+    ['今日调用', `${fmtNum(u.today.calls)} 次`],
+    ['日均', fmtNum(u.average.per_day_tokens)],
+    ['平均每次', fmtNum(u.average.per_call_tokens)],
+  ];
+  if (u.average.estimated_days_left !== null) {
+    stats.push(['预计可用', u.average.lasts_whole_cycle ? '本周期充足' : `${u.average.estimated_days_left} 天`]);
+  }
+  stats.push(['最近调用', fmtTime(u.last_call_at)]);
+  $('#usageStats').innerHTML = stats.map(([k, v]) => `<span>${k} <b>${v}</b></span>`).join('');
+
+  $('#usageUpdated').textContent = `更新于 ${fmtTime(u.updated_at)}`;
+  if ($('#settingsOverlay').classList.contains('hidden')) {
+    $('#cfgQuota').value = u.quota_per_month;
+    $('#cfgCycleDay').value = u.cycle_start_day;
+  }
+  $('#usageFile').textContent = `账本：${u.storage}`;
+}
+
+/* ==================================================================
+   设置面板
+   ================================================================== */
+let CONFIG = null;
+
+function openSettings() {
+  $('#settingsOverlay').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  loadConfig();
+  loadKeyPool();
+}
+function closeSettings() {
+  $('#settingsOverlay').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+async function loadConfig() {
+  try {
+    const r = await apiFetch('/api/config');
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error?.message || '读取配置失败');
+    CONFIG = j.data;
+    renderConfig(CONFIG);
+  } catch (e) {
+    $('#cfgNotice').innerHTML = `<div class="notice err">读取配置失败：${escapeHtml(e.message || e)}</div>`;
+  }
+}
+
+function renderConfig(cfg) {
+  const notices = [];
+  const conflicts = (cfg.env_conflicts || []).filter(c => c.overrides_saved);
+  if (!cfg.effective.api_key.configured) {
+    notices.push(`<div class="notice warn">尚未配置 API Key，检测功能不可用。请填写下方输入框并点击「保存」。</div>`);
+  }
+  if (conflicts.length) {
+    notices.push(
+      `<div class="notice warn"><b>环境变量正覆盖界面设置</b><br>` +
+      conflicts.map(c =>
+        `· ${c.label}：环境变量 <code>${c.env_var}</code> = ${escapeHtml(c.env_value)}` +
+        (c.config_value ? `，界面保存的是 ${escapeHtml(c.config_value)}` : '，界面未保存该项')
+      ).join('<br>') +
+      `<br>要让界面保存的值生效，请先在终端执行 <code>unset ${conflicts[0].env_var}</code> 再重启服务。</div>`
+    );
+  }
+  $('#cfgNotice').innerHTML = notices.join('');
+
+  $('#cfgPath').textContent = cfg.config_file;
+  $('#cfgEndpoint').value = cfg.saved.endpoint || '';
+  $('#cfgTimeout').value = cfg.saved.timeout_ms ?? '';
+  $('#cfgMaxChars').value = cfg.saved.max_chars ?? '';
+  $('#cfgCacheTtl').value = cfg.saved.cache_ttl_ms ?? '';
+  $('#cfgPort').value = cfg.saved.port ?? '';
+  $('#cfgHost').value = cfg.saved.host || '';
+  $('#cfgServerToken').value = '';
+  $('#cfgServerToken').placeholder = cfg.saved.server_token ? `已保存：${cfg.saved.server_token}（留空不修改）` : '留空表示不鉴权';
+  $('#cfgAutoOpen').value = cfg.saved.auto_open === undefined ? '' : String(cfg.saved.auto_open);
+
+  // Key 输入框采取「留空即不修改」语义，避免掩码值被当成真 Key 回写
+  const savedKey = cfg.saved.api_key || '';
+  const keyInput = $('#cfgApiKey');
+  keyInput.value = '';
+  keyInput.placeholder = savedKey ? `已保存：${savedKey}（留空则不修改）` : '粘贴 EdgeOne Makers API Key';
+
+  $('#cfgPaths').innerHTML =
+    `配置文件 <b>${escapeHtml(cfg.config_file)}</b><br>` +
+    `当前生效 Key <b>${escapeHtml(cfg.runtime.api_key.masked || '未配置')}</b> · 来源 <b>${escapeHtml(cfg.runtime.api_key.source || 'none')}</b><br>` +
+    `上游 <b>${escapeHtml(cfg.runtime.endpoint)}</b> · 服务 <b>${escapeHtml(cfg.runtime.host)}:${cfg.runtime.port}</b>` +
+    (cfg.runtime.server_token_required ? ' · <b>已启用访问令牌</b>' : '');
+
+  renderKeyChip(cfg);
+}
+
+function renderKeyChip(cfg) {
+  const chip = $('#keyChip');
+  const k = cfg?.runtime?.api_key;
+  if (k && k.configured) {
+    chip.textContent = `Key：${k.masked}`;
+    chip.classList.remove('bad');
+    chip.title = `来源：${k.source}　点击修改`;
+  } else {
+    chip.textContent = 'Key：未配置';
+    chip.classList.add('bad');
+    chip.title = '点击填写朱雀 API Key';
+  }
+}
+
+/** 收集表单（留空 = 不修改该项） */
+function collectConfig(includeKey) {
+  const patch = {};
+  if (includeKey) {
+    const k = $('#cfgApiKey').value.trim();
+    if (k) patch.api_key = k;
+  }
+  const put = (key, sel) => {
+    const raw = $(sel).value.trim();
+    if (raw === '') return;
+    patch[key] = raw;
+  };
+  // 数字项必须在本地就校验：否则 Number('abc') = NaN，JSON.stringify 会变成 null，
+  // 服务端会把 null 理解成「删除该项」，用户在毫无提示的情况下丢掉配置。
+  const putNum = (key, sel, label) => {
+    const raw = $(sel).value.trim();
+    if (raw === '') return;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || !Number.isInteger(n) || n < (key === 'cache_ttl_ms' ? 0 : 1)) {
+      throw new Error(`${label} 需要填写不小于 1 的整数，当前是「${raw}」。`);
+    }
+    patch[key] = n;
+  };
+  put('endpoint', '#cfgEndpoint');
+  putNum('timeout_ms', '#cfgTimeout', '请求超时（毫秒）');
+  putNum('max_chars', '#cfgMaxChars', '单块最大字符数');
+  putNum('cache_ttl_ms', '#cfgCacheTtl', '缓存有效期（毫秒）');
+  putNum('port', '#cfgPort', '服务端口');
+  put('host', '#cfgHost');
+  put('server_token', '#cfgServerToken');
+  const ao = $('#cfgAutoOpen').value;
+  if (ao !== '') patch.auto_open = ao === 'true';
+  return patch;
+}
+
+async function saveConfig() {
+  const btn = $('#saveCfg');
+  btn.disabled = true;
+  btn.textContent = '保存中…';
+  try {
+    // collectConfig 会做数字校验并抛错，所以必须放在 try 里
+    const patch = collectConfig(true);
+    if (!Object.keys(patch).length) {
+      setTestResult('busy', '没有需要保存的改动（留空的项表示不修改）。');
+      return;
+    }
+    const r = await apiFetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+    const j = await r.json();
+    if (!j.ok) throw new Error(`[${j.error.code}] ${j.error.message}${j.error.hint ? ' — ' + j.error.hint : ''}`);
+    const parts = ['✓ 已保存'];
+    if (j.data.backup) parts.push(`原文件已备份为 ${j.data.backup.split('/').pop()}`);
+    if (j.data.restart_required?.length) parts.push(`⚠ ${j.data.restart_required.join('、')} 需重启服务才生效`);
+    setTestResult(j.data.restart_required?.length ? 'busy' : 'ok', parts.join('　·　'));
+    $('#cfgApiKey').value = '';
+    await loadConfig();
+    await loadUsage();
+  } catch (e) {
+    setTestResult('bad', e.message || String(e));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '保存';
+  }
+}
+
+async function testKey() {
+  const btn = $('#testKey');
+  btn.disabled = true;
+  btn.textContent = '测试中…';
+  setTestResult('busy', '正在用当前配置发起一次最小请求…');
+  try {
+    const body = {};
+    const k = $('#cfgApiKey').value.trim();
+    if (k) body.api_key = k;
+    const ep = $('#cfgEndpoint').value.trim();
+    if (ep) body.endpoint = ep;
+    const r = await apiFetch('/api/config/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const j = await r.json();
+    if (!j.ok) throw new Error(`[${j.error.code}] ${j.error.message}`);
+    const d = j.data;
+    if (d.reachable) {
+      setTestResult('ok', `✓ 连接正常（${d.latency_ms}ms）　Key ${d.key_masked}（${d.key_source}）　探测结论：${d.probe.verdict_name}　本次计费 ${d.billed_tokens} token`);
+    } else {
+      const e = d.error || {};
+      setTestResult('bad', `✗ [${e.code || 'UNKNOWN'}] ${e.message || '连接失败'}${e.hint ? '　→ ' + e.hint : ''}`);
+    }
+  } catch (e) {
+    setTestResult('bad', '测试请求失败：' + (e.message || e));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '测试连接';
+  }
+}
+
+function setTestResult(kind, text) {
+  const el = $('#testResult');
+  el.className = 'test-msg ' + kind;
+  el.textContent = text;
+}
+
+async function clearKey() {
+  if (!confirm('确定要清除已保存的 API Key 吗？（只影响本机配置文件，不影响 EdgeOne 控制台）')) return;
+  try {
+    const r = await apiFetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clear: { api_key: true } }),
+    });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error.message);
+    setTestResult('ok', '已清除本机保存的 API Key。');
+    await loadConfig();
+    await loadUsage();
+  } catch (e) {
+    setTestResult('bad', e.message || String(e));
+  }
+}
+
+async function postUsage(path, body, okMsg) {
+  try {
+    const r = await apiFetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {}),
+    });
+    const j = await r.json();
+    if (!j.ok) throw new Error(`[${j.error.code}] ${j.error.message}${j.error.hint ? ' — ' + j.error.hint : ''}`);
+    if (j.data.summary) renderUsage(j.data.summary);
+    else await loadUsage();
+    setTestResult('ok', okMsg);
+  } catch (e) {
+    setTestResult('bad', e.message || String(e));
+  }
+}
+
+$('#btnCalibrate').onclick = () => {
+  const v = $('#cfgCalibrate').value.trim();
+  if (v === '') { setTestResult('bad', '请先填入控制台显示的已用 token 数。'); return; }
+  postUsage('/api/usage/calibrate', { tokens: Number(v) }, `✓ 已用控制台读数 ${v} token 校准（不消耗额度）`);
+};
+$('#btnSaveQuota').onclick = () =>
+  postUsage('/api/usage/quota',
+    { quota_per_month: Number($('#cfgQuota').value), cycle_start_day: Number($('#cfgCycleDay').value) },
+    '✓ 额度设置已更新');
+$('#btnClearCalibration').onclick = () => postUsage('/api/usage/reset', { calibration_only: true }, '✓ 已清除校准偏移');
+$('#btnResetUsage').onclick = () => {
+  if (!confirm('确定要清空本地用量账本吗？这不会影响 EdgeOne 云端数据，只是把本地统计归零。')) return;
+  postUsage('/api/usage/reset', {}, '✓ 本地账本已清空');
+};
+
+/* ---- 事件绑定 ---- */
+$('#openSettings').onclick = openSettings;
+$('#closeSettings').onclick = closeSettings;
+$('#keyChip').onclick = openSettings;
+$('#settingsOverlay').addEventListener('click', (e) => {
+  if (e.target.id === 'settingsOverlay') closeSettings();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !$('#settingsOverlay').classList.contains('hidden')) closeSettings();
+});
+$('#toggleKey').onclick = () => {
+  const i = $('#cfgApiKey');
+  const show = i.type === 'password';
+  i.type = show ? 'text' : 'password';
+  $('#toggleKey').textContent = show ? '隐藏' : '显示';
+};
+$('#testKey').onclick = testKey;
+$('#saveCfg').onclick = saveConfig;
+$('#clearKey').onclick = clearKey;
+$('#refreshUsage').onclick = () => { loadUsage(); };
+
+function setupAutoRefresh() {
+  if (usageTimer) clearInterval(usageTimer);
+  if ($('#autoRefresh').checked) usageTimer = setInterval(loadUsage, 30000);
+}
+$('#autoRefresh').onchange = setupAutoRefresh;
+document.addEventListener('visibilitychange', () => { if (!document.hidden) loadUsage(); });
+
+/* ---- 服务状态 ---- */
+apiFetch('/api/health')
+  .then((r) => r.json())
+  .then((h) => {
+    const st = $('#status'), tx = $('#statusText');
+    const ok = h.server_key?.configured;
+    st.classList.add(ok ? 'ok' : 'bad');
+    // 剩余额度在「用量」页展示（/api/usage）；状态栏只报服务与 Key 状态
+    tx.textContent = ok
+      ? `服务正常 · Key ${h.server_key?.masked || '已配置'}`
+      : '服务正常，但尚未配置 API Key';
+    // 首屏就用 health 的结果把 Key 芯片填对，不必等设置面板打开
+    renderKeyChip({
+      runtime: {
+        api_key: {
+          configured: Boolean(ok),
+          masked: h.server_key?.masked || '',
+          source: h.server_key?.source || 'none',
+        },
+      },
+    });
+    if (!ok) {
+      $('#keyChip').classList.add('bad');
+      setTimeout(openSettings, 400); // 首次使用直接引导去填 Key
+    }
+  })
+  .catch(() => {
+    $('#status').classList.add('bad');
+    $('#statusText').textContent = '无法连接服务';
+  });
+
+loadUsage();
+loadHistory();
+setupAutoRefresh();
+syncCount();
+</script>
+</body>
+</html>

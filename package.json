@@ -1,0 +1,52 @@
+{
+  "name": "zhuque-detect",
+  "version": "1.3.0",
+  "private": true,
+  "description": "基于腾讯朱雀 AI 文本检测的 MCP 工具，让 Codex、WorkBuddy 等 Agent 自动检测、定位、改写并复检 AI 率。",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "zhuque": "./src/cli.mjs"
+  },
+  "main": "./src/core.mjs",
+  "exports": {
+    ".": "./src/core.mjs",
+    "./schema": "./src/schema.mjs",
+    "./server": "./src/server.mjs",
+    "./mcp": "./src/mcp-server.mjs"
+  },
+  "scripts": {
+    "test": "node src/selftest.mjs && node tests/security.test.mjs && node tests/site.test.mjs",
+    "test:web": "node src/webcheck.mjs",
+    "test:all": "node src/selftest.mjs && node tests/security.test.mjs && node tests/site.test.mjs && node tests/platform.test.mjs && node src/webcheck.mjs && node scripts/check-release.mjs",
+    "serve": "node src/cli.mjs serve --open",
+    "mcp": "node src/mcp-server.mjs",
+    "doctor": "node src/cli.mjs doctor",
+    "install-mcp": "node src/cli.mjs install-mcp",
+    "pack": "node scripts/pack.mjs",
+    "pack:mac": "node scripts/pack.mjs --platform mac",
+    "pack:win": "node scripts/pack.mjs --platform win"
+  },
+  "files": [
+    "src",
+    "public",
+    "bin",
+    "scripts",
+    "start.sh",
+    "README.md",
+    "LICENSE"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TakimotoUki/zhuque-detect.git"
+  },
+  "homepage": "https://takimotouki.github.io/zhuque-detect/",
+  "author": "TakimotoUki",
+  "contributors": [
+    "TakimotoUki",
+    "Codex"
+  ]
+}
